@@ -1,9 +1,16 @@
-#[derive(Debug)]
+use std::fmt;
+
 pub struct Token {
     pub kind: TokenKind,
 
     pub start: usize,
     pub end: usize,
+}
+
+impl fmt::Debug for Token {
+    fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
+        write!(f , "{:?} ({}, {})", self.kind, self.start, self.end )
+    }
 }
 
 #[derive(Copy,Clone,Debug,PartialEq)]
@@ -81,8 +88,6 @@ pub enum TokenKind {
     Unknown,
 }
 
-type K = TokenKind;
-
 //  ---------------------------------------------------------------------------------------------------------------  //
 
 #[derive(Copy,Clone,PartialEq,Debug)]
@@ -111,7 +116,7 @@ impl < 'a > TokenStream < 'a >{
             bytes: s.as_bytes(),
             pos: 0,
 
-            prev_kind: K::None,
+            prev_kind: TokenKind::None,
             state: State::Normal,
             n_opened_curlies: 0,
             opened_quotes: Vec::new(),
@@ -149,9 +154,9 @@ impl < 'a > TokenStream < 'a >{
 
         if pos >= bytes.len() {
             return match self.prev_kind {
-                K::EOF => ( K::None, pos ),
-                K::EOL => ( K::EOF, pos ),
-                _ => ( K::EOL, pos ),
+                TokenKind::EOF => ( TokenKind::None, pos ),
+                TokenKind::EOL => ( TokenKind::EOF, pos ),
+                _ => ( TokenKind::EOL, pos ),
             };
 
         } else {
@@ -165,7 +170,7 @@ impl < 'a > TokenStream < 'a >{
                     self.n_opened_curlies = 0;
                     self.opened_quotes.clear();
 
-                    return ( K::Quote, i );
+                    return ( T!['"'], i );
                 }
 
                 ( b'"', State::StringExpr ) => {
@@ -173,7 +178,7 @@ impl < 'a > TokenStream < 'a >{
                     self.opened_quotes.push( self.n_opened_curlies );
                     self.n_opened_curlies = 0;
 
-                    return ( K::Quote, i );
+                    return ( T!['"'], i );
                 }
 
                 ( b'"', State::StringFragment ) => {
@@ -185,7 +190,7 @@ impl < 'a > TokenStream < 'a >{
                         self.state = State::StringExpr;
                     }
 
-                    return ( K::Quote, i );
+                    return ( T!['"'], i );
                 }
 
                 ( b'$', State::StringFragment ) => {
@@ -193,14 +198,14 @@ impl < 'a > TokenStream < 'a >{
                         self.state = State::StringExpr;
                         self.n_opened_curlies = 1;
 
-                        return ( K::DollarOpenBrace, i + 1 );
+                        return ( T!["${"], i + 1 );
                     }
                 }
 
                 ( b'{', State::StringExpr ) => {
                     self.n_opened_curlies += 1;
 
-                    return ( K::OpenBrace, i );
+                    return ( T!['{'], i );
                 }
 
                 ( b'}', State::StringExpr ) => {
@@ -209,13 +214,13 @@ impl < 'a > TokenStream < 'a >{
                         self.state = State::StringFragment;
                     }
 
-                    return ( K::CloseBrace, i );
+                    return ( T!['}'], i );
                 }
 
                 ( b'\n', _ ) => {
                     self.state = State::Normal;
 
-                    return ( K::EOL, i );
+                    return ( TokenKind::EOL, i );
                 }
 
                 ( _, State::StringFragment ) => {
@@ -234,14 +239,14 @@ impl < 'a > TokenStream < 'a >{
                         }
                     }
 
-                    return ( K::StringFragment, i );
+                    return ( TokenKind::StringFragment, i );
                 }
 
                 _ => (),
             }
 
             match b {
-                b' ' => ( K::Space, self.iterate_while( i, is_space ) ),
+                b' ' => ( T![ ], self.iterate_while( i, is_space ) ),
 
                 b'/' => {
                     match self.bytes.get( i ) {
@@ -253,10 +258,10 @@ impl < 'a > TokenStream < 'a >{
                                     _ => { i += 1 },
                                 }
                             }
-                            ( K::Comment, i )
+                            ( TokenKind::Comment, i )
                         }
-                        Some( b'=' ) => ( K::SlashEq, i + 1 ),
-                        _ => ( K::Slash, i ),
+                        Some( b'=' ) => ( T![/=], i + 1 ),
+                        _ => ( T![/], i ),
                     }
                 }
 
@@ -272,132 +277,132 @@ impl < 'a > TokenStream < 'a >{
                     let i = self.iterate_while( i, is_digit );
 
                     if self.byte_is( i, b'.' ) && self.byte_matches( i, is_digit ) {
-                        ( K::Float, self.iterate_while( i + 1, is_digit ) )
+                        ( TokenKind::Float, self.iterate_while( i + 1, is_digit ) )
                     } else {
-                        ( K::Int, i )
+                        ( TokenKind::Int, i )
                     }
                 }
 
                 b'+' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::PlusEq, i + 1 )
+                        ( T![+=], i + 1 )
                     } else {
-                        ( K::Plus, i )
+                        ( T![+], i )
                     }
                 }
 
                 b'-' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::MinusEq, i + 1 )
+                        ( T![-=], i + 1 )
                     } else {
-                        ( K::Minus, i )
+                        ( T![-], i )
                     }
                 }
 
                 b'*' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::StarEq, i + 1 )
+                        ( T![*=], i + 1 )
                     } else {
-                        ( K::Star, i )
+                        ( T![*], i )
                     }
                 }
 
                 b'%' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::PercentEq, i + 1 )
+                        ( T![%=], i + 1 )
                     } else {
-                        ( K::Percent, i )
+                        ( T![%], i )
                     }
                 }
 
                 b'=' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::EqEq, i + 1 )
+                        ( T![==], i + 1 )
                     } else {
-                        ( K::Eq, i )
+                        ( T![=], i )
                     }
                 }
 
                 b'<' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::LtEq, i + 1 )
+                        ( T![<=], i + 1 )
                     } else {
-                        ( K::Lt, i )
+                        ( T![<], i )
                     }
                 }
 
                 b'>' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::GtEq, i + 1 )
+                        ( T![>=], i + 1 )
                     } else {
-                        ( K::Gt, i )
+                        ( T![>], i )
                     }
                 }
 
                 b'&' => {
                     if self.byte_is( i, b'&' ) {
                         if self.byte_is( i + 1, b'=' ) {
-                            ( K::AmpAmpEq, i + 2 )
+                            ( T![&&=], i + 2 )
                         } else {
-                            ( K::AmpAmp, i + 1 )
+                            ( T![&&], i + 1 )
                         }
                     } else {
-                        ( K::Amp, i )
+                        ( T![&], i )
                     }
                 }
 
                 b'|' => {
                     if self.byte_is( i, b'|' ) {
                         if self.byte_is( i + 1, b'=' ) {
-                            ( K::PipePipeEq, i + 2 )
+                            ( T![||=], i + 2 )
                         } else {
-                            ( K::PipePipe, i + 1 )
+                            ( T![||], i + 1 )
                         }
                     } else {
-                        ( K::Pipe, i )
+                        ( T![|], i )
                     }
                 }
 
                 b'!' => {
                     if self.byte_is( i, b'=' ) {
-                        ( K::BangEq, i + 1 )
+                        ( T![!=], i + 1 )
                     } else {
-                        ( K::Bang, i )
+                        ( T![!], i )
                     }
                 }
 
                 b'.' => {
                     if self.byte_is( i, b'.' ) {
                         if self.byte_is( i + 1, b'.' ) {
-                            ( K::DotDotDot, i + 2 )
+                            ( T![...], i + 2 )
                         } else {
-                            ( K::DotDot, i + 1 )
+                            ( T![..], i + 1 )
                         }
                     } else {
-                        ( K::Dot, i )
+                        ( T![.], i )
                     }
                 }
 
-                b'(' => ( K::OpenParen, i ),
-                b')' => ( K::CloseParen, i ),
-                b'[' => ( K::OpenBracket, i ),
-                b']' => ( K::CloseBracket, i ),
-                b'{' => ( K::OpenBrace, i ),
-                b'}' => ( K::CloseBrace, i ),
-                b':' => ( K::Colon, i ),
-                b';' => ( K::Semicolon, i ),
-                b',' => ( K::Comma, i ),
-                b'@' => ( K::At, i ),
-                b'#' => ( K::Pound, i ),
-                b'^' => ( K::Caret, i ),
-                b'~' => ( K::Tilde, i ),
-                b'?' => ( K::Question, i ),
-                b'\'' => ( K::Apos, i ),
-                b'`' => ( K::Backtick, i ),
-                b'$' => ( K::Dollar, i ),
-                b'\\' => ( K::Backslash, i ),
+                b'(' => ( T!['('], i ),
+                b')' => ( T![')'], i ),
+                b'[' => ( T!['['], i ),
+                b']' => ( T![']'], i ),
+                b'{' => ( T!['{'], i ),
+                b'}' => ( T!['}'], i ),
+                b':' => ( T![:], i ),
+                b';' => ( T![;], i ),
+                b',' => ( T![,], i ),
+                b'@' => ( T![@], i ),
+                b'#' => ( T![#], i ),
+                b'^' => ( T![^], i ),
+                b'~' => ( T![~], i ),
+                b'?' => ( T![?], i ),
+                b'\'' => ( T!['\''], i ),
+                b'`' => ( T!['`'], i ),
+                b'$' => ( T![$], i ),
+                b'\\' => ( T!['\\'], i ),
 
-                _ => ( K::Unknown, self.iterate_while( i, is_error ) ),
+                _ => ( TokenKind::Unknown, self.iterate_while( i, is_error ) ),
             }
         }
     }
@@ -410,7 +415,7 @@ impl < 'a> Iterator for TokenStream < 'a > {
         let start = self.pos;
         let ( kind, end ) = self.get_token_kind();
 
-        if kind == K::None {
+        if kind == TokenKind::None {
             return None;
         }
 
@@ -447,12 +452,75 @@ fn is_error( b: u8 ) -> bool {
 
 fn id_or_keyword( id: &[ u8 ] ) -> TokenKind {
     match id {
-        b"struct" => K::Struct,
-        b"const" => K::Const,
-        b"let" => K::Let,
-        b"if" => K::If,
-        b"for" => K::For,
-        b"fn" => K::Fn,
-        _ => K::Ident,
+        b"struct" => T![struct],
+        b"const" => T![const],
+        b"let" => T![let],
+        b"if" => T![if],
+        b"for" => T![for],
+        b"fn" => T![fn],
+        _ => TokenKind::Ident,
     }
 }
+
+#[macro_export]
+macro_rules !T {
+    [ ] => { TokenKind::Space };
+    [!] => { TokenKind::Bang };
+    ['"'] => { TokenKind::Quote };
+    [#] => { TokenKind::Pound };
+    [$] => { TokenKind::Dollar };
+    [%] => { TokenKind::Percent };
+    [&] => { TokenKind::Amp };
+    ['\''] => { TokenKind::Apos };
+    ['('] => { TokenKind::OpenParen };
+    [')'] => { TokenKind::CloseParen };
+    [*] => { TokenKind::Star };
+    [+] => { TokenKind::Plus };
+    [,] => { TokenKind::Comma };
+    [-] => { TokenKind::Minus };
+    [.] => { TokenKind::Dot };
+    [/] => { TokenKind::Slash };
+    [:] => { TokenKind::Colon };
+    [;] => { TokenKind::Semicolon };
+    [<] => { TokenKind::Lt };
+    [=] => { TokenKind::Eq };
+    [>] => { TokenKind::Gt };
+    [?] => { TokenKind::Question };
+    [@] => { TokenKind::At };
+    ['['] => { TokenKind::OpenBracket };
+    ['\\'] => { TokenKind::Backslash };
+    [']'] => { TokenKind::CloseBracket };
+    [^] => { TokenKind::Caret };
+    ['`'] => { TokenKind::Backtick };
+    ['{'] => { TokenKind::OpenBrace };
+    [|] => { TokenKind::Pipe };
+    ['}'] => { TokenKind::CloseBrace };
+    [~] => { TokenKind::Tilde };
+
+    [!=] => { TokenKind::BangEq };
+    [%=] => { TokenKind::PercentEq };
+    [&&] => { TokenKind::AmpAmp };
+    [&&=] => { TokenKind::AmpAmpEq };
+    [*=] => { TokenKind::StarEq };
+    [+=] => { TokenKind::PlusEq };
+    [-=] => { TokenKind::MinusEq };
+    [..] => { TokenKind::DotDot };
+    [...] => { TokenKind::DotDotDot };
+    [/=] => { TokenKind::SlashEq };
+    [<=] => { TokenKind::LtEq };
+    [==] => { TokenKind::EqEq };
+    [>=] => { TokenKind::GtEq };
+    [||] => { TokenKind::PipePipe };
+    [||=] => { TokenKind::PipePipeEq };
+
+    ["${"] => { TokenKind::DollarOpenBrace };
+
+    [struct] => { TokenKind::Struct };
+    [const] => { TokenKind::Const };
+    [let] => { TokenKind::Let };
+    [if] => { TokenKind::If };
+    [for] => { TokenKind::For };
+    [fn] => { TokenKind::Fn };
+
+}
+pub use T;

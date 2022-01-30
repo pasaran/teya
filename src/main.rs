@@ -1,7 +1,7 @@
 mod token_stream;
 
-// use parser_input::ParserInput;
-use token_stream::{ TokenStream };
+use token_stream::TokenStream;
+use token_stream::TokenKind;
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
@@ -11,6 +11,8 @@ fn main() {
     for token in ts {
         println!( "{:?}", token );
     }
+
+    println!( "{:?}", T![ ] );
 }
 
 /*

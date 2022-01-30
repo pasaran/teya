@@ -14,10 +14,10 @@ pub enum TokenKind {
     Bang,
     Quote,
     Pound,
-    //  Dollar,
+    Dollar,
     Percent,
     Amp,
-    //  Apos,
+    Apos,
     OpenParen,
     CloseParen,
     Star,
@@ -27,22 +27,22 @@ pub enum TokenKind {
     Dot,
     Slash,
     Colon,
-    //  Semicolon,
+    Semicolon,
     Lt,
     Eq,
     Gt,
     Question,
     At,
     OpenBracket,
-    //  Backslash,
+    Backslash,
     CloseBracket,
-    //  Caret,
+    Caret,
     //  Underscore,
-    //  Backtick,
+    Backtick,
     OpenBrace,
     Pipe,
     CloseBrace,
-    //  Tilde,
+    Tilde,
 
     BangEq,
     PercentEq,
@@ -78,7 +78,7 @@ pub enum TokenKind {
     If,
     For,
 
-    Error,
+    Unknown,
 }
 
 type K = TokenKind;
@@ -241,10 +241,10 @@ impl < 'a > TokenStream < 'a >{
             }
 
             match b {
-                b' ' => return ( K::Space, self.iterate_while( i, is_space ) ),
+                b' ' => ( K::Space, self.iterate_while( i, is_space ) ),
 
                 b'/' => {
-                    return match self.bytes.get( i ) {
+                    match self.bytes.get( i ) {
                         Some( b'/' ) => {
                             i += 1;
                             loop {
@@ -265,103 +265,139 @@ impl < 'a > TokenStream < 'a >{
                 b'_' => {
                     i = self.iterate_while( i, is_id_next );
 
-                    return ( id_or_keyword( self.bytes.get(  pos .. i ).unwrap() ), i );
+                    ( id_or_keyword( self.bytes.get(  pos .. i ).unwrap() ), i )
                 }
 
                 b'0' ..= b'9' => {
                     let i = self.iterate_while( i, is_digit );
+
                     if self.byte_is( i, b'.' ) && self.byte_matches( i, is_digit ) {
-                        return ( K::Float, self.iterate_while( i + 1, is_digit ) );
+                        ( K::Float, self.iterate_while( i + 1, is_digit ) )
+                    } else {
+                        ( K::Int, i )
                     }
-                    return ( K::Int, i );
                 }
 
                 b'+' => {
-                    if self.byte_is( i, b'=' ) { return ( K::PlusEq, i + 1 ); }
-                    return ( K::Plus, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::PlusEq, i + 1 )
+                    } else {
+                        ( K::Plus, i )
+                    }
                 }
 
                 b'-' => {
-                    if self.byte_is( i, b'=' ) { return ( K::MinusEq, i + 1 ); }
-                    return ( K::Minus, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::MinusEq, i + 1 )
+                    } else {
+                        ( K::Minus, i )
+                    }
                 }
 
                 b'*' => {
-                    if self.byte_is( i, b'=' ) { return ( K::StarEq, i + 1 ); }
-                    return ( K::Star, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::StarEq, i + 1 )
+                    } else {
+                        ( K::Star, i )
+                    }
                 }
 
                 b'%' => {
-                    if self.byte_is( i, b'=' ) { return ( K::PercentEq, i + 1 ); }
-                    return ( K::Percent, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::PercentEq, i + 1 )
+                    } else {
+                        ( K::Percent, i )
+                    }
                 }
 
                 b'=' => {
-                    if self.byte_is( i, b'=' ) { return ( K::EqEq, i + 1 ); }
-                    return ( K::Eq, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::EqEq, i + 1 )
+                    } else {
+                        ( K::Eq, i )
+                    }
                 }
 
                 b'<' => {
-                    if self.byte_is( i, b'=' ) { return ( K::LtEq, i + 1 ); }
-                    return ( K::Lt, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::LtEq, i + 1 )
+                    } else {
+                        ( K::Lt, i )
+                    }
                 }
 
                 b'>' => {
-                    if self.byte_is( i, b'=' ) { return ( K::GtEq, i + 1 ); }
-                    return ( K::Gt, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::GtEq, i + 1 )
+                    } else {
+                        ( K::Gt, i )
+                    }
                 }
 
                 b'&' => {
                     if self.byte_is( i, b'&' ) {
-                        if self.byte_is( i + 1, b'=' ) { return ( K::AmpAmpEq, i + 2 ); }
-                        return ( K::AmpAmp, i + 1 );
+                        if self.byte_is( i + 1, b'=' ) {
+                            ( K::AmpAmpEq, i + 2 )
+                        } else {
+                            ( K::AmpAmp, i + 1 )
+                        }
+                    } else {
+                        ( K::Amp, i )
                     }
-                    return ( K::Amp, i );
                 }
 
                 b'|' => {
                     if self.byte_is( i, b'|' ) {
-                        if self.byte_is( i + 1, b'=' ) { return ( K::PipePipeEq, i + 2 ); }
-                        return ( K::PipePipe, i + 1 );
+                        if self.byte_is( i + 1, b'=' ) {
+                            ( K::PipePipeEq, i + 2 )
+                        } else {
+                            ( K::PipePipe, i + 1 )
+                        }
+                    } else {
+                        ( K::Pipe, i )
                     }
-                    return ( K::Pipe, i );
                 }
 
                 b'!' => {
-                    if self.byte_is( i, b'=' ) { return ( K::BangEq, i + 1 ); }
-                    return ( K::Bang, i );
+                    if self.byte_is( i, b'=' ) {
+                        ( K::BangEq, i + 1 )
+                    } else {
+                        ( K::Bang, i )
+                    }
                 }
 
                 b'.' => {
                     if self.byte_is( i, b'.' ) {
-                        if self.byte_is( i + 1, b'.' ) { return ( K::DotDotDot, i + 2 ); }
-                        return ( K::DotDot, i + 1 );
+                        if self.byte_is( i + 1, b'.' ) {
+                            ( K::DotDotDot, i + 2 )
+                        } else {
+                            ( K::DotDot, i + 1 )
+                        }
+                    } else {
+                        ( K::Dot, i )
                     }
-                    return ( K::Dot, i );
                 }
 
-                b'(' => return ( K::OpenParen, i ),
-                b')' => return ( K::CloseParen, i ),
-                b'[' => return ( K::OpenBracket, i ),
-                b']' => return ( K::CloseBracket, i ),
-                b'{' => return ( K::OpenBrace, i ),
-                b'}' => return ( K::CloseBrace, i ),
-                b':' => return ( K::Colon, i ),
-                //  b';' => return ( K::Semicolon, i ),
-                b',' => return ( K::Comma, i ),
-                b'@' => return ( K::At, i ),
-                b'#' => return ( K::Pound, i ),
-                //  b'^' => return ( K::Caret, i ),
-                //  b'~' => return ( K::Tilde, i ),
-                b'?' => return ( K::Question, i ),
-                //  b'\'' => return ( K::Apos, i ),
-                //  b'`' => return ( K::Backtick, i ),
-                //  b'$' => return ( K::Dollar, i ),
-                //  b'\\' => return ( K::Backslash, i ),
+                b'(' => ( K::OpenParen, i ),
+                b')' => ( K::CloseParen, i ),
+                b'[' => ( K::OpenBracket, i ),
+                b']' => ( K::CloseBracket, i ),
+                b'{' => ( K::OpenBrace, i ),
+                b'}' => ( K::CloseBrace, i ),
+                b':' => ( K::Colon, i ),
+                b';' => ( K::Semicolon, i ),
+                b',' => ( K::Comma, i ),
+                b'@' => ( K::At, i ),
+                b'#' => ( K::Pound, i ),
+                b'^' => ( K::Caret, i ),
+                b'~' => ( K::Tilde, i ),
+                b'?' => ( K::Question, i ),
+                b'\'' => ( K::Apos, i ),
+                b'`' => ( K::Backtick, i ),
+                b'$' => ( K::Dollar, i ),
+                b'\\' => ( K::Backslash, i ),
 
-                _ => {
-                    return ( K::Error, self.iterate_while( i, is_error ) );
-                }
+                _ => ( K::Unknown, self.iterate_while( i, is_error ) ),
             }
         }
     }
@@ -406,9 +442,7 @@ fn is_digit( b: u8 ) -> bool {
 
 #[inline]
 fn is_error( b: u8 ) -> bool {
-    b < b'\n' ||
-    b > b'\n' && b < b' ' ||
-    b > b'~'
+    b != b'\n' && ( b < b' ' || b > b'~' )
 }
 
 fn id_or_keyword( id: &[ u8 ] ) -> TokenKind {

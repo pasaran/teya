@@ -99,10 +99,8 @@ impl Parser {
     }
 
     fn push_tokens( &self, tree: &mut SyntaxNode, start: usize, end: usize ) {
-        for i in start .. end {
-            if let Some( &token ) = self.tokens.get( i ) {
-                tree.push( SyntaxElement::Token( token ) );
-            }
+        for token in &self.tokens[ start .. end ] {
+            tree.push( SyntaxElement::Token( *token ) );
         }
     }
 

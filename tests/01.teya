@@ -9,3 +9,4 @@ fn add
         while i > 0
             x - y - !!-z
 
+    foo().bar.quu( x, y )

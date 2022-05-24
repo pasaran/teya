@@ -315,7 +315,7 @@ fn r_inline_unary( p: &mut Parser ) -> Node {
 }
 
 fn r_inline_primary( p: &mut Parser ) -> Node {
-    let expr = match p.curr() {
+    let mut expr = match p.curr() {
         Some( T![ '(' ] ) => r_inline_subexpr( p ),
         Some( TokenKind::Number ) => r_inline_number( p ),
         Some( TokenKind::Id ) => r_inline_var( p ),
@@ -323,48 +323,37 @@ fn r_inline_primary( p: &mut Parser ) -> Node {
         _ => unreachable!(),
     };
 
+    loop {
+        if p.is( T![ . ] ) {
+            let mut n = expr.start();
+            n.add( expr );
+            p.eat( T![ . ] );
+            p.eat( TokenKind::Id );
+
+            if p.is( T![ '(' ] ) {
+                n.add( r_inline_args( p ) );
+
+                expr = p.end( n, SyntaxKind::InlineMethodCall );
+
+            } else {
+                expr = p.end( n, SyntaxKind::InlineField );
+            }
+
+        } else if p.is( T![ '(' ] ) {
+            let mut n = expr.start();
+
+            n.add( r_inline_args( p ) );
+
+            expr = p.end( n, SyntaxKind::InlineCall );
+
+        } else {
+            break;
+        }
+    }
+
     expr
 
-    // if p.is( T![ . ] ) || p.is( T![ '(' ] ) {
-    //     r_inline_path_steps( p );
-
-    //     n.end( SyntaxKind::InlinePath );
-
-    // } else {
-    //     n.cancel();
-    // }
 }
-
-// fn r_inline_path_steps( p: &mut Parser ) {
-//     let m = p.start();
-
-//     while let Some( kind ) = p.curr() {
-//         match kind {
-//             T![ . ] => r_inline_path_step_prop( p ),
-//             T![ '(' ] => r_inline_path_step_method( p ),
-//             _ => { break },
-//         }
-//     }
-
-//     m.end( SyntaxKind::InlinePathSteps );
-// }
-
-// fn r_inline_path_step_prop( p: &mut Parser ) {
-//     let m = p.start();
-
-//     p.eat( T![ . ] );
-//     p.eat( TokenKind::Id );
-
-//     m.end( SyntaxKind::InlinePathStepProp );
-// }
-
-// fn r_inline_path_step_method( p: &mut Parser ) {
-//     let m = p.start();
-
-//     r_inline_args( p );
-
-//     m.end( SyntaxKind::InlinePathStepMethod );
-// }
 
 fn r_inline_subexpr( p: &mut Parser ) -> Node {
     let mut n = p.start();
@@ -392,26 +381,26 @@ fn r_inline_var( p: &mut Parser ) -> Node {
     p.end( n, SyntaxKind::InlineVar )
 }
 
-// fn r_inline_args( p: &mut Parser ) {
-//     let m = p.start();
+fn r_inline_args( p: &mut Parser ) -> Node {
+    let mut n = p.start();
 
-//     p.eat( T![ '(' ] );
-//     while !p.is( T![')'] ) && !p.is_eol() {
-//         r_inline_arg( p );
-//         p.eat( T![ , ] );
-//     }
-//     p.eat( T![ ')' ] );
+    p.eat( T![ '(' ] );
+    while !p.is( T![')'] ) && !p.is_eol() {
+        n.add( r_inline_arg( p ) );
+        p.eat( T![ , ] );
+    }
+    p.eat( T![ ')' ] );
 
-//     m.end( SyntaxKind::InlineArgs );
-// }
+    p.end( n, SyntaxKind::InlineArgs )
+}
 
-// fn r_inline_arg( p: &mut Parser ) {
-//     let m = p.start();
+fn r_inline_arg( p: &mut Parser ) -> Node {
+    let mut n = p.start();
 
-//     r_inline_expr( p );
+    n.add( r_inline_expr( p ) );
 
-//     m.end( SyntaxKind::InlineArg );
-// }
+    p.end( n, SyntaxKind::InlineArg )
+}
 
 fn r_inline_string( p: &mut Parser ) -> Node {
     let mut n = p.start();

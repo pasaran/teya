@@ -18,12 +18,13 @@ pub enum SyntaxKind {
     InlineSubexpr,
     InlineNumber,
     InlineVar,
+
     InlineArgs,
     InlineArg,
-    InlinePath,
-    InlinePathSteps,
-    InlinePathStepMethod,
-    InlinePathStepProp,
+
+    InlineCall,
+    InlineField,
+    InlineMethodCall,
 
     InlineString,
     InlineStringFragment,

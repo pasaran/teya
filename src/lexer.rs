@@ -1,5 +1,8 @@
 use std::fmt;
 
+use crate::token_kind::{ TokenKind, T };
+
+#[derive(Clone,Copy)]
 pub struct Token {
     pub kind: TokenKind,
 
@@ -9,83 +12,8 @@ pub struct Token {
 
 impl fmt::Debug for Token {
     fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-        write!(f , "{:?} ({}, {})", self.kind, self.start, self.end )
+        write!( f , "{:?} {} .. {}", self.kind, self.start, self.end )
     }
-}
-
-#[derive(Copy,Clone,Debug,PartialEq)]
-pub enum TokenKind {
-    None,
-
-    Space,
-    Bang,
-    Quote,
-    Pound,
-    Dollar,
-    Percent,
-    Amp,
-    Apos,
-    OpenParen,
-    CloseParen,
-    Star,
-    Plus,
-    Comma,
-    Minus,
-    Dot,
-    Slash,
-    Colon,
-    Semicolon,
-    Lt,
-    Eq,
-    Gt,
-    Question,
-    At,
-    OpenBracket,
-    Backslash,
-    CloseBracket,
-    Caret,
-    //  Underscore,
-    Backtick,
-    OpenBrace,
-    Pipe,
-    CloseBrace,
-    Tilde,
-
-    BangEq,
-    PercentEq,
-    AmpAmp,
-    AmpAmpEq,
-    StarEq,
-    PlusEq,
-    MinusEq,
-    DotDot,
-    DotDotDot,
-    SlashEq,
-    LtEq,
-    EqEq,
-    GtEq,
-    PipePipe,
-    PipePipeEq,
-
-    EOL,
-    EOF,
-    //  Indent,
-    //  Dedent,
-    Comment,
-    Ident,
-    Int,
-    Float,
-    StringFragment,
-    DollarOpenBrace,
-
-    Struct,
-    Let,
-    Const,
-    Fn,
-    If,
-    For,
-
-    Unknown,
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
@@ -98,7 +26,7 @@ enum State {
 }
 
 #[derive(Clone)]
-pub struct TokenStream < 'a> {
+pub struct Lexer < 'a> {
     bytes: &'a [ u8 ],
 
     pos: usize,
@@ -109,10 +37,10 @@ pub struct TokenStream < 'a> {
     opened_quotes: Vec< u32 >,
 }
 
-impl < 'a > TokenStream < 'a >{
+impl < 'a > Lexer < 'a >{
 
     pub fn new( s: &'a str ) -> Self {
-        TokenStream {
+        Lexer {
             bytes: s.as_bytes(),
             pos: 0,
 
@@ -277,9 +205,9 @@ impl < 'a > TokenStream < 'a >{
                     let i = self.iterate_while( i, is_digit );
 
                     if self.byte_is( i, b'.' ) && self.byte_matches( i, is_digit ) {
-                        ( TokenKind::Float, self.iterate_while( i + 1, is_digit ) )
+                        ( TokenKind::Number, self.iterate_while( i + 1, is_digit ) )
                     } else {
-                        ( TokenKind::Int, i )
+                        ( TokenKind::Number, i )
                     }
                 }
 
@@ -309,7 +237,7 @@ impl < 'a > TokenStream < 'a >{
 
                 b'%' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![%=], i + 1 )
+                        ( T![ %= ], i + 1 )
                     } else {
                         ( T![%], i )
                     }
@@ -355,9 +283,11 @@ impl < 'a > TokenStream < 'a >{
                     if self.byte_is( i, b'|' ) {
                         if self.byte_is( i + 1, b'=' ) {
                             ( T![||=], i + 2 )
+
                         } else {
                             ( T![||], i + 1 )
                         }
+
                     } else {
                         ( T![|], i )
                     }
@@ -375,9 +305,11 @@ impl < 'a > TokenStream < 'a >{
                     if self.byte_is( i, b'.' ) {
                         if self.byte_is( i + 1, b'.' ) {
                             ( T![...], i + 2 )
+
                         } else {
                             ( T![..], i + 1 )
                         }
+
                     } else {
                         ( T![.], i )
                     }
@@ -408,7 +340,7 @@ impl < 'a > TokenStream < 'a >{
     }
 }
 
-impl < 'a> Iterator for TokenStream < 'a > {
+impl < 'a > Iterator for Lexer < 'a > {
     type Item = Token;
 
     fn next( &mut self ) -> Option< Token > {
@@ -428,6 +360,7 @@ impl < 'a> Iterator for TokenStream < 'a > {
             end,
         } )
     }
+
 }
 
 #[inline]
@@ -457,70 +390,8 @@ fn id_or_keyword( id: &[ u8 ] ) -> TokenKind {
         b"let" => T![let],
         b"if" => T![if],
         b"for" => T![for],
+        b"while" => T![while],
         b"fn" => T![fn],
-        _ => TokenKind::Ident,
+        _ => TokenKind::Id,
     }
 }
-
-#[macro_export]
-macro_rules !T {
-    [ ] => { TokenKind::Space };
-    [!] => { TokenKind::Bang };
-    ['"'] => { TokenKind::Quote };
-    [#] => { TokenKind::Pound };
-    [$] => { TokenKind::Dollar };
-    [%] => { TokenKind::Percent };
-    [&] => { TokenKind::Amp };
-    ['\''] => { TokenKind::Apos };
-    ['('] => { TokenKind::OpenParen };
-    [')'] => { TokenKind::CloseParen };
-    [*] => { TokenKind::Star };
-    [+] => { TokenKind::Plus };
-    [,] => { TokenKind::Comma };
-    [-] => { TokenKind::Minus };
-    [.] => { TokenKind::Dot };
-    [/] => { TokenKind::Slash };
-    [:] => { TokenKind::Colon };
-    [;] => { TokenKind::Semicolon };
-    [<] => { TokenKind::Lt };
-    [=] => { TokenKind::Eq };
-    [>] => { TokenKind::Gt };
-    [?] => { TokenKind::Question };
-    [@] => { TokenKind::At };
-    ['['] => { TokenKind::OpenBracket };
-    ['\\'] => { TokenKind::Backslash };
-    [']'] => { TokenKind::CloseBracket };
-    [^] => { TokenKind::Caret };
-    ['`'] => { TokenKind::Backtick };
-    ['{'] => { TokenKind::OpenBrace };
-    [|] => { TokenKind::Pipe };
-    ['}'] => { TokenKind::CloseBrace };
-    [~] => { TokenKind::Tilde };
-
-    [!=] => { TokenKind::BangEq };
-    [%=] => { TokenKind::PercentEq };
-    [&&] => { TokenKind::AmpAmp };
-    [&&=] => { TokenKind::AmpAmpEq };
-    [*=] => { TokenKind::StarEq };
-    [+=] => { TokenKind::PlusEq };
-    [-=] => { TokenKind::MinusEq };
-    [..] => { TokenKind::DotDot };
-    [...] => { TokenKind::DotDotDot };
-    [/=] => { TokenKind::SlashEq };
-    [<=] => { TokenKind::LtEq };
-    [==] => { TokenKind::EqEq };
-    [>=] => { TokenKind::GtEq };
-    [||] => { TokenKind::PipePipe };
-    [||=] => { TokenKind::PipePipeEq };
-
-    ["${"] => { TokenKind::DollarOpenBrace };
-
-    [struct] => { TokenKind::Struct };
-    [const] => { TokenKind::Const };
-    [let] => { TokenKind::Let };
-    [if] => { TokenKind::If };
-    [for] => { TokenKind::For };
-    [fn] => { TokenKind::Fn };
-
-}
-pub use T;

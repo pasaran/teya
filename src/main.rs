@@ -1,18 +1,33 @@
-mod token_stream;
+mod token_kind;
+mod lexer;
+mod parser;
+mod syntax_kind;
+mod syntax_node;
 
-use token_stream::TokenStream;
-use token_stream::TokenKind;
+pub use syntax_kind::{ SyntaxKind };
+pub use token_kind::{ TokenKind };
+pub use lexer::{ Lexer, Token };
+pub use syntax_node::{ SyntaxNode, SyntaxElement };
+
+use std::fs;
+
+use crate::parser::Parser;
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
 fn main() {
-    let ts = TokenStream::new( "\"Foo ${ { { \"foo-${ x }\" } } } Bar $ } Boo\"" );
+    let content = fs::read_to_string( "./tests/01.teya" ).unwrap();
+    let mut parser = Parser::new( &content );
 
-    for token in ts {
-        println!( "{:?}", token );
-    }
+    let node = parser.parse( SyntaxKind::SourceFile );
+    println!( "{:?}", node );
 
-    println!( "{:?}", T![ ] );
+    //  let ts = TokenStream::new( content.as_str() );
+    // for token in ts {
+    //     println!( "{:?}", token );
+    // }
+
+    // println!( "{:?}", T![ ] );
 }
 
 /*

@@ -285,9 +285,6 @@ fn infix_binding_power( kind: Option< TokenKind > ) -> Option< ( i8, i8 ) > {
 
 fn r_inline_binary( p: &mut Parser, min_bp: i8 ) -> Node {
     let mut left = r_inline_unary( p );
-    if infix_binding_power( p.curr() ).is_none() {
-        return left;
-    }
 
     while let Some ( ( left_bp, right_bp ) ) = infix_binding_power( p.curr() ) {
         if left_bp < min_bp {

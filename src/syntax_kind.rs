@@ -10,6 +10,7 @@ pub enum SyntaxKind {
     For,
     While,
     Expr,
+    Let,
 
     InlineExpr,
     InlineBinary,
@@ -19,8 +20,13 @@ pub enum SyntaxKind {
     InlineNumber,
     InlineVar,
 
-    InlineArgs,
-    InlineArg,
+    FnArgs,
+    FnArg,
+    FnReturnType,
+    TypeRef,
+
+    CallArgs,
+    CallArg,
 
     InlineCall,
     InlineField,

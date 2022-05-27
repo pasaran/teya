@@ -307,10 +307,69 @@ fn r_fn( p: &mut Parser ) -> Node {
 
     p.eat( T![ fn ] );
     p.eat( TokenKind::Id );
+    n.add( r_fn_args( p ) );
+    if p.is_kind( T![ -> ] ) {
+        n.add( r_fn_return_type( p ) );
+    }
     p.eol();
     n.add( r_block( p ) );
 
     p.end( n, SyntaxKind::Fn )
+}
+
+fn r_fn_args( p: &mut Parser ) -> Node {
+    let mut n = p.start();
+
+    p.eat( T![ '(' ] );
+    while !p.is_eol() && !p.is_kind( T![ ')' ] ) {
+        n.add( r_fn_arg( p ) );
+        p.eat( T![ , ] );
+    }
+    p.eat( T![ ')' ] );
+
+    p.end( n, SyntaxKind::FnArgs )
+}
+
+fn r_fn_arg( p: &mut Parser ) -> Node {
+    let mut n = p.start();
+
+    p.eat( TokenKind::Id );
+    p.eat( T![ : ] );
+    n.add( r_typeref( p ) );
+
+    p.end( n, SyntaxKind::FnArg )
+}
+
+fn r_fn_return_type( p: &mut Parser ) -> Node {
+    let mut n = p.start();
+
+    p.eat( T![ -> ] );
+    n.add( r_typeref( p ) );
+
+    p.end( n, SyntaxKind::FnReturnType )
+}
+
+fn r_typeref( p: &mut Parser ) -> Node {
+    let n = p.start();
+
+    p.eat( TokenKind::Id );
+
+    p.end( n, SyntaxKind::TypeRef )
+}
+
+fn r_let( p: &mut Parser ) -> Node {
+    let mut n = p.start();
+
+    p.eat( T![ let ] );
+    p.eat( TokenKind::Id );
+    if p.is_kind( T![ : ] ) {
+        p.eat( T![ : ] );
+        n.add( r_typeref( p ) );
+    }
+    p.eat( T![ = ] );
+    n.add( r_expr( p ) );
+
+    p.end( n, SyntaxKind::Let )
 }
 
 fn r_if( p: &mut Parser ) -> Node {
@@ -334,6 +393,8 @@ fn r_while( p: &mut Parser ) -> Node {
 
     p.end( n, SyntaxKind::While )
 }
+
+//  ---------------------------------------------------------------------------------------------------------------  //
 
 fn r_inline_expr( p: &mut Parser ) -> Node {
     r_inline_binary( p, 0 )
@@ -460,7 +521,7 @@ fn r_inline_args( p: &mut Parser ) -> Node {
     }
     p.eat( T![ ')' ] );
 
-    p.end( n, SyntaxKind::InlineArgs )
+    p.end( n, SyntaxKind::CallArgs )
 }
 
 fn r_inline_arg( p: &mut Parser ) -> Node {
@@ -468,7 +529,7 @@ fn r_inline_arg( p: &mut Parser ) -> Node {
 
     n.add( r_inline_expr( p ) );
 
-    p.end( n, SyntaxKind::InlineArg )
+    p.end( n, SyntaxKind::CallArg )
 }
 
 fn r_inline_string( p: &mut Parser ) -> Node {
@@ -513,12 +574,14 @@ fn r_inline_string_expr( p: &mut Parser ) -> Node {
     p.end( n, SyntaxKind::InlineStringExpr )
 }
 
+//  ---------------------------------------------------------------------------------------------------------------  //
+
 fn r_block( p: &mut Parser ) -> Node {
     let mut n = p.start();
 
     p.indent();
     while !p.is_eof() && !p.is_dedent() {
-        n.add( r_block_expr( p ) );
+        n.add( r_block_statement( p ) );
     }
     p.dedent();
 
@@ -534,10 +597,11 @@ fn r_expr( p: &mut Parser ) -> Node {
     p.end( n, SyntaxKind::Expr )
 }
 
-fn r_block_expr( p: &mut Parser ) -> Node {
+fn r_block_statement( p: &mut Parser ) -> Node {
     match p.kind() {
         Some( T![ if ] ) => r_if( p ),
         Some( T![ while ] ) => r_while( p ),
+        Some( T![ let ] ) => r_let( p ),
         _ => r_expr( p ),
     }
 }

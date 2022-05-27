@@ -1,4 +1,7 @@
-fn add
+fn add( x: number, y: number ) -> string
+    let x = 1
+    let y: number = ( 1 + 2 ).foo( x, y )
+
     if x > 0
         "Foo"
 
@@ -8,7 +11,9 @@ fn add
 
     "Tee"
 
-fn sub
+    //  Comment
+
+fn sub()
     "Foo"
 
 

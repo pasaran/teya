@@ -221,9 +221,13 @@ impl < 'a > Lexer < 'a >{
 
                 b'-' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![-=], i + 1 )
+                        ( T![ -= ], i + 1 )
+
+                    } else if self.byte_is( i, b'>' ) {
+                        ( T![ -> ], i + 1 )
+
                     } else {
-                        ( T![-], i )
+                        ( T![ - ], i )
                     }
                 }
 

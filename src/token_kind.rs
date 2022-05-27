@@ -43,6 +43,7 @@ pub enum TokenKind {
     StarEq,
     PlusEq,
     MinusEq,
+    MinusGt,
     DotDot,
     DotDotDot,
     SlashEq,
@@ -116,6 +117,7 @@ macro_rules !T {
     [*=] => { TokenKind::StarEq };
     [+=] => { TokenKind::PlusEq };
     [-=] => { TokenKind::MinusEq };
+    [->] => { TokenKind::MinusGt };
     [..] => { TokenKind::DotDot };
     [...] => { TokenKind::DotDotDot };
     [/=] => { TokenKind::SlashEq };

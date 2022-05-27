@@ -1,13 +1,13 @@
 use crate::{ Lexer, Token, TokenKind, T, SyntaxKind, SyntaxNode, SyntaxElement };
 
-#[derive(Clone, Copy)]
-enum Skipper {
-    None,
-    Inline,
-    Block,
-}
+// #[derive(Clone, Copy)]
+// enum Skipper {
+//     None,
+//     Inline,
+//     Block,
+// }
 
-pub struct Node {
+struct Node {
     start: usize,
     end: usize,
     kind: SyntaxKind,
@@ -16,7 +16,7 @@ pub struct Node {
 
 impl Node {
 
-    pub fn new( start: usize ) -> Self {
+    fn new( start: usize ) -> Self {
         Node {
             start,
             end: 0,
@@ -25,11 +25,11 @@ impl Node {
         }
     }
 
-    pub fn start( &self ) -> Node {
+    fn start( &self ) -> Node {
         Node::new( self.start )
     }
 
-    pub fn end( mut self, end: usize, kind: SyntaxKind ) -> Self {
+    fn end( mut self, end: usize, kind: SyntaxKind ) -> Self {
         self.kind = kind;
         self.end = end;
 
@@ -49,9 +49,14 @@ pub struct Parser {
 
     pos: usize,
 
-    skipper: Skipper,
+    // skipper: Skipper,
 
     last_eaten_token_pos: usize,
+
+    current_indent: usize,
+    indents: Vec< usize >,
+    n_indent: usize,
+    n_dedent: usize,
 }
 
 impl Parser {
@@ -63,9 +68,14 @@ impl Parser {
 
             pos: 0,
 
-            skipper: Skipper::None,
+            // skipper: Skipper::None,
 
             last_eaten_token_pos: 0,
+
+            current_indent: 0,
+            indents: vec![],
+            n_indent: 0,
+            n_dedent: 0,
         }
     }
 
@@ -73,7 +83,7 @@ impl Parser {
         let node = match kind {
             SyntaxKind::SourceFile => r_source_file( self ),
             SyntaxKind::InlineExpr => r_inline_expr( self ),
-            _ => panic!( "Invalid kind" ),
+            _ => panic!( "Invalid kind {:?}", kind ),
         };
 
         self.build_tree( node )
@@ -104,33 +114,41 @@ impl Parser {
         }
     }
 
-    fn get( &self ) -> Option< &Token > {
-        self.tokens.get( self.pos )
+    fn nth( &self, n: usize ) -> Option< &Token > {
+        self.tokens.get( self.pos + n )
     }
 
-    fn curr( &self ) -> Option< TokenKind > {
-        self.get().map( | t | t.kind )
+    fn nth_kind( &self, n: usize ) -> Option< TokenKind > {
+        self.nth( n ).map( | t | t.kind )
     }
 
-    fn is( &self, kind: TokenKind ) -> bool {
-        self.get().map_or( false, | t | t.kind == kind )
+    fn kind( &self ) -> Option< TokenKind > {
+        self.nth_kind( 0 )
+    }
+
+    fn is_kind( &self, kind: TokenKind ) -> bool {
+        self.nth( 0 ).map_or( false, | t | t.kind == kind )
     }
 
     fn is_eof( &self ) -> bool {
-        self.is( TokenKind::EOF )
+        self.is_kind( TokenKind::EOF )
     }
 
     fn is_eol( &self ) -> bool {
-        self.is( TokenKind::EOL )
+        self.is_kind( TokenKind::EOL )
+    }
+
+    fn mov( &mut self, n: usize ) {
+        self.pos += n;
     }
 
     fn eat( &mut self, kind: TokenKind ) -> Option< Token > {
-        if let Some( &t ) = self.get() {
+        if let Some( &t ) = self.nth( 0 ) {
             if t.kind == kind {
                 // println!( "eaten={:?}", kind );
                 self.last_eaten_token_pos = self.pos;
-                self.pos += 1;
-                self.skip();
+                self.mov( 1 );
+                self.skip_spaces();
 
                 return Some( t );
             }
@@ -140,13 +158,12 @@ impl Parser {
     }
 
     fn eat_any( &mut self ) -> Option< Token > {
-        if let Some( &t ) = self.get() {
-            // let kind = self.curr();
+        if let Some( &t ) = self.nth( 0 ) {
+            // println!( "eaten_any={:?}", self.kind() );
             self.last_eaten_token_pos = self.pos;
-            self.pos += 1;
-            self.skip();
+            self.mov( 1 );
+            self.skip_spaces();
 
-            // println!( "eaten_any={:?}", kind );
 
             return Some( t );
         }
@@ -162,44 +179,101 @@ impl Parser {
         node.end( self.last_eaten_token_pos, kind )
     }
 
-    fn eol( &mut self ) -> Option< Token > {
-        self.eat( TokenKind::EOL )
+    fn eol( &mut self ) {
+        self.last_eaten_token_pos = self.pos;
+        // println!( "EOL!!!" );
+        // println!( "{:?} {:?} {:?}", self.nth_kind( 1 ), self.nth_kind( 2 ), self.indents );
+        while self.is_eol() {
+            self.mov( 1 );
+
+            let mut indent = 0;
+            let token = self.nth( 0 );
+            if let Some( token ) = token {
+                if token.kind == T![ ] {
+                    indent = token.end - token.start;
+
+                    self.mov( 1 );
+
+                }
+            }
+
+            match self.kind() {
+                Some( TokenKind::EOL | TokenKind::Comment ) => {
+                    self.eat( TokenKind::Comment );
+                    continue;
+                }
+
+                _ => {
+                    self.n_indent = 0;
+                    self.n_dedent = 0;
+
+                    // println!( "indent={} current_indent={} indents={:?}", indent, self.current_indent, self.indents );
+
+                    if indent > self.current_indent {
+                        self.indents.push( self.current_indent );
+                        self.current_indent = indent;
+
+                        self.n_indent = 1;
+
+                    } else if indent < self.current_indent {
+                        while let Some( last ) = self.indents.pop() {
+                            self.current_indent = last;
+                            self.n_dedent += 1;
+
+                            if last == indent {
+                                break;
+                            }
+                        }
+                    }
+
+                }
+            }
+
+        }
+
+        // println!( "n_indent={} n_dedent={}", self.n_indent, self.n_dedent );
+
+    }
+
+    fn is_indent( &self ) -> bool {
+        self.n_indent > 0
+    }
+
+    fn is_dedent( &self ) -> bool {
+        self.n_dedent > 0
     }
 
     fn indent( &mut self ) {
+        if self.is_indent() {
+            self.n_indent -= 1;
 
+        } else {
+            panic!( "No indent ");
+        }
     }
 
     fn dedent( &mut self ) {
+        if self.is_dedent() {
+            self.n_dedent -= 1;
 
-    }
-
-    fn set_skipper( &mut self, skipper: Skipper ) -> Skipper {
-        let old_skipper = self.skipper;
-
-        self.skipper = skipper;
-        self.skip();
-
-        old_skipper
-    }
-
-    fn skip( &mut self ) {
-        match self.skipper {
-            Skipper::Inline => {
-                while self.is( T![ ] ) {
-                    self.pos += 1;
-                }
-            },
-
-            Skipper::Block => {
-                while self.is( T![ ] ) || self.is( TokenKind::EOL ) || self.is( TokenKind::Comment ) {
-                    self.pos += 1;
-                }
-            },
-
-            Skipper::None => (),
+        } else {
+            panic!( "No dedent" );
         }
+    }
 
+    // fn set_skipper( &mut self, skipper: Skipper ) -> Skipper {
+    //     let old_skipper = self.skipper;
+
+    //     self.skipper = skipper;
+    //     self.skip_spaces();
+
+    //     old_skipper
+    // }
+
+    fn skip_spaces( &mut self ) {
+        if self.is_kind( T![ ] ) {
+            self.pos += 1;
+        }
     }
 
 }
@@ -208,21 +282,19 @@ impl Parser {
 
 fn r_source_file( p: &mut Parser ) -> Node {
     let mut n = p.start();
-    let skipper = p.set_skipper( Skipper::Block );
 
     while !p.is_eof() {
         n.add( r_statement( p ) );
     }
 
-    p.set_skipper( skipper );
-
-    p.end( n, SyntaxKind::SourceFile )
+    n.end( p.pos, SyntaxKind::SourceFile )
+    // p.end( n, SyntaxKind::SourceFile )
 }
 
 fn r_statement( p: &mut Parser ) -> Node {
-    match p.curr() {
+    match p.kind() {
         Some( T![ fn ] ) => r_fn( p ),
-        _ => unreachable!()
+        _ => unreachable!( "{:?}", p.kind() )
     }
 }
 
@@ -231,7 +303,7 @@ fn r_fn( p: &mut Parser ) -> Node {
 
     p.eat( T![ fn ] );
     p.eat( TokenKind::Id );
-    p.eat( TokenKind::EOL );
+    p.eol();
     n.add( r_block( p ) );
 
     p.end( n, SyntaxKind::Fn )
@@ -260,13 +332,7 @@ fn r_while( p: &mut Parser ) -> Node {
 }
 
 fn r_inline_expr( p: &mut Parser ) -> Node {
-    let skipper = p.set_skipper( Skipper::Inline );
-
-    let expr = r_inline_binary( p, 0 );
-
-    p.set_skipper( skipper );
-
-    expr
+    r_inline_binary( p, 0 )
 }
 
 fn infix_binding_power( kind: Option< TokenKind > ) -> Option< ( i8, i8 ) > {
@@ -284,7 +350,7 @@ fn infix_binding_power( kind: Option< TokenKind > ) -> Option< ( i8, i8 ) > {
 fn r_inline_binary( p: &mut Parser, min_bp: i8 ) -> Node {
     let mut left = r_inline_unary( p );
 
-    while let Some ( ( left_bp, right_bp ) ) = infix_binding_power( p.curr() ) {
+    while let Some ( ( left_bp, right_bp ) ) = infix_binding_power( p.kind() ) {
         if left_bp < min_bp {
             break;
 
@@ -303,19 +369,19 @@ fn r_inline_binary( p: &mut Parser, min_bp: i8 ) -> Node {
 }
 
 fn r_inline_unary( p: &mut Parser ) -> Node {
-    if p.curr() == Some( T![ + ] ) || p.curr() == Some( T![ - ] ) || p.curr() == Some( T![ ! ] ) {
-        let mut n = p.start();
-        p.eat_any();
-        n.add( r_inline_unary( p ) );
-        p.end( n, SyntaxKind::InlineUnary )
-
-    } else {
-        r_inline_primary( p )
+    match p.kind() {
+        Some( T![ + ] | T![ - ] |  T![ ! ] ) => {
+            let mut n = p.start();
+            p.eat_any();
+            n.add( r_inline_unary( p ) );
+            p.end( n, SyntaxKind::InlineUnary )
+        }
+        _ => r_inline_primary( p )
     }
 }
 
 fn r_inline_primary( p: &mut Parser ) -> Node {
-    let mut expr = match p.curr() {
+    let mut expr = match p.kind() {
         Some( T![ '(' ] ) => r_inline_subexpr( p ),
         Some( TokenKind::Number ) => r_inline_number( p ),
         Some( TokenKind::Id ) => r_inline_var( p ),
@@ -324,13 +390,13 @@ fn r_inline_primary( p: &mut Parser ) -> Node {
     };
 
     loop {
-        if p.is( T![ . ] ) {
+        if p.is_kind( T![ . ] ) {
             let mut n = expr.start();
             n.add( expr );
             p.eat( T![ . ] );
             p.eat( TokenKind::Id );
 
-            if p.is( T![ '(' ] ) {
+            if p.is_kind( T![ '(' ] ) {
                 n.add( r_inline_args( p ) );
 
                 expr = p.end( n, SyntaxKind::InlineMethodCall );
@@ -339,7 +405,7 @@ fn r_inline_primary( p: &mut Parser ) -> Node {
                 expr = p.end( n, SyntaxKind::InlineField );
             }
 
-        } else if p.is( T![ '(' ] ) {
+        } else if p.is_kind( T![ '(' ] ) {
             let mut n = expr.start();
 
             n.add( r_inline_args( p ) );
@@ -352,7 +418,6 @@ fn r_inline_primary( p: &mut Parser ) -> Node {
     }
 
     expr
-
 }
 
 fn r_inline_subexpr( p: &mut Parser ) -> Node {
@@ -385,7 +450,7 @@ fn r_inline_args( p: &mut Parser ) -> Node {
     let mut n = p.start();
 
     p.eat( T![ '(' ] );
-    while !p.is( T![')'] ) && !p.is_eol() {
+    while !p.is_kind( T![ ')' ] ) && !p.is_eol() {
         n.add( r_inline_arg( p ) );
         p.eat( T![ , ] );
     }
@@ -408,7 +473,7 @@ fn r_inline_string( p: &mut Parser ) -> Node {
     p.eat( T![ '"' ] );
 
     while !p.is_eol() {
-        match p.curr() {
+        match p.kind() {
             Some( T![ '"' ] ) => {
                 p.eat( T![ '"' ] );
                 break;
@@ -447,15 +512,11 @@ fn r_inline_string_expr( p: &mut Parser ) -> Node {
 fn r_block( p: &mut Parser ) -> Node {
     let mut n = p.start();
 
-    let skipper = p.set_skipper( Skipper::Block );
-
     p.indent();
-    while !p.is_eof() {
+    while !p.is_eof() && !p.is_dedent() {
         n.add( r_block_expr( p ) );
     }
     p.dedent();
-
-    p.set_skipper( skipper );
 
     p.end( n, SyntaxKind::Block )
 }
@@ -463,18 +524,14 @@ fn r_block( p: &mut Parser ) -> Node {
 fn r_expr( p: &mut Parser ) -> Node {
     let mut n = p.start();
 
-    let skipper = p.set_skipper( Skipper::Inline );
-
     n.add( r_inline_expr( p ) );
-    p.eat( TokenKind::EOL );
-
-    p.set_skipper( skipper );
+    p.eol();
 
     p.end( n, SyntaxKind::Expr )
 }
 
 fn r_block_expr( p: &mut Parser ) -> Node {
-    match p.curr() {
+    match p.kind() {
         Some( T![ if ] ) => r_if( p ),
         Some( T![ while ] ) => r_while( p ),
         _ => r_expr( p ),

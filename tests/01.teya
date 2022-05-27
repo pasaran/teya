@@ -1,12 +1,15 @@
-//  01.teya
-
-//  add
 fn add
-    //  begin
+    if x > 0
+        "Foo"
 
-    //  add x and y
-    if x > 0 && y > 0
-        while i > 0
-            x - y - !!-z
+    if y > 0
+        "Bar"
+        "Quu"
 
-    foo().bar.quu( x, y )
+    "Tee"
+
+fn sub
+    "Foo"
+
+
+//  Comment

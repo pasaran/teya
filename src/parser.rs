@@ -198,8 +198,12 @@ impl Parser {
             }
 
             match self.kind() {
-                Some( TokenKind::EOL | TokenKind::Comment ) => {
-                    self.eat( TokenKind::Comment );
+                Some( TokenKind::EOL ) => {
+                    continue;
+                }
+
+                Some( TokenKind::Comment ) => {
+                    self.mov( 1 );
                     continue;
                 }
 

@@ -2,17 +2,17 @@ use std::fmt;
 
 use crate::{ SyntaxKind, Token };
 
-pub enum SyntaxElement {
-    Node( SyntaxNode ),
-    Token( Token ),
+pub enum SyntaxElement< 'a > {
+    Node( SyntaxNode< 'a > ),
+    Token( Token< 'a > ),
 }
 
-pub struct SyntaxNode {
+pub struct SyntaxNode< 'a > {
     kind: SyntaxKind,
-    children: Vec< SyntaxElement >,
+    children: Vec< SyntaxElement< 'a > >,
 }
 
-impl fmt::Debug for SyntaxNode {
+impl < 'a >fmt::Debug for SyntaxNode< 'a > {
     fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
         write!( f , "{}", format_node( self, 0 ) )
     }
@@ -41,7 +41,7 @@ fn format_children( node: &SyntaxNode, indent: usize ) -> String {
         .join( "\n" )
 }
 
-impl SyntaxNode {
+impl < 'a > SyntaxNode< 'a > {
 
     pub fn new( kind: SyntaxKind ) -> Self {
         SyntaxNode {
@@ -50,7 +50,7 @@ impl SyntaxNode {
         }
     }
 
-    pub fn push( &mut self, element: SyntaxElement ) {
+    pub fn push( &mut self, element: SyntaxElement< 'a > ) {
         self.children.push( element );
     }
 

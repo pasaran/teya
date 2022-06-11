@@ -3,7 +3,7 @@ use std::mem;
 use crate::{ SyntaxKind, Token, ParserError, SyntaxNode, SyntaxElement };
 
 #[ derive( Debug ) ]
-pub enum ParserEvent {
+pub enum ParserEvent< 'a > {
 
     Start{
         kind: SyntaxKind,
@@ -13,7 +13,7 @@ pub enum ParserEvent {
     Finish,
 
     Token{
-        token: Token,
+        token: Token< 'a >,
     },
 
     Error{
@@ -22,7 +22,7 @@ pub enum ParserEvent {
 
 }
 
-impl ParserEvent {
+impl < 'a > ParserEvent< 'a > {
 
     pub fn empty() -> Self {
         ParserEvent::Start {

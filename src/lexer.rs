@@ -3,16 +3,17 @@ use std::fmt;
 use crate::token_kind::{ TokenKind, T };
 
 #[derive(Clone,Copy)]
-pub struct Token {
+pub struct Token< 'a > {
     pub kind: TokenKind,
+    pub text: &'a str,
 
     pub start: usize,
     pub end: usize,
 }
 
-impl fmt::Debug for Token {
+impl < 'a > fmt::Debug for Token< 'a > {
     fn fmt( &self, f: &mut fmt::Formatter ) -> fmt::Result {
-        write!( f , "{:?} {} .. {}", self.kind, self.start, self.end )
+        write!( f , "{:?} @{}..{} {:?}", self.kind, self.start, self.end, self.text )
     }
 }
 
@@ -27,6 +28,7 @@ enum State {
 
 #[derive(Clone)]
 pub struct Lexer < 'a> {
+    input: &'a str,
     bytes: &'a [ u8 ],
 
     pos: usize,
@@ -39,9 +41,10 @@ pub struct Lexer < 'a> {
 
 impl < 'a > Lexer < 'a >{
 
-    pub fn new( s: &'a str ) -> Self {
+    pub fn new( input: &'a str ) -> Self {
         Lexer {
-            bytes: s.as_bytes(),
+            input,
+            bytes: input.as_bytes(),
             pos: 0,
 
             prev_kind: TokenKind::None,
@@ -370,9 +373,9 @@ impl < 'a > Lexer < 'a >{
 }
 
 impl < 'a > Iterator for Lexer < 'a > {
-    type Item = Token;
+    type Item = Token< 'a >;
 
-    fn next( &mut self ) -> Option< Token > {
+    fn next( &mut self ) -> Option< Token< 'a > > {
         let start = self.pos;
         let ( kind, end ) = self.get_token_kind();
 
@@ -385,6 +388,7 @@ impl < 'a > Iterator for Lexer < 'a > {
 
         Some( Token {
             kind,
+            text: self.input.get( start .. end ).unwrap(),
             start,
             end,
         } )

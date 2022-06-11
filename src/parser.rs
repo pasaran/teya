@@ -70,12 +70,12 @@ impl CompletedMarker {
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-pub struct Parser {
+pub struct Parser< 'a > {
 
-    //  input: &'a str,
-    pub tokens: Vec< Token >,
+    input: &'a str,
+    pub tokens: Vec< Token< 'a > >,
 
-    events: Vec< ParserEvent >,
+    events: Vec< ParserEvent< 'a > >,
     errors: Vec< ParserError >,
 
     pos: usize,
@@ -86,11 +86,11 @@ pub struct Parser {
     last_eaten_token_pos: usize,
 }
 
-impl Parser {
+impl < 'a > Parser< 'a > {
 
-    pub fn new( input: &str ) -> Self {
+    pub fn new( input: &'a str ) -> Self {
         Parser {
-            //  input,
+            input,
             tokens: Lexer::new( input ).collect(),
 
             events: vec![],
@@ -116,7 +116,7 @@ impl Parser {
         // self.build_tree( node )
     }
 
-    pub fn finish( self ) -> Vec< ParserEvent >  {
+    pub fn finish( self ) -> Vec< ParserEvent< 'a > >  {
         self.events
     }
 
@@ -145,7 +145,7 @@ impl Parser {
     //     }
     // }
 
-    pub fn push_event( &mut self, event: ParserEvent ) {
+    pub fn push_event( &mut self, event: ParserEvent< 'a > ) {
         self.events.push( event );
     }
 

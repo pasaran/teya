@@ -379,7 +379,13 @@ fn r_while( p: &mut Parser ) -> CompletedMarker {
 //  ---------------------------------------------------------------------------------------------------------------  //
 
 fn r_inline_expr( p: &mut Parser ) -> CompletedMarker {
-    r_inline_binary( p, 0 )
+    p.set_skipper( Skipper::Inline );
+
+    let m = r_inline_binary( p, 0 );
+
+    p.restore_skipper();
+
+    m
 }
 
 fn infix_binding_power( kind: Option< TokenKind > ) -> Option< ( i8, i8 ) > {

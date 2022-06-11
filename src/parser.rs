@@ -265,6 +265,7 @@ impl Parser {
     pub fn restore_skipper( &mut self ) {
         if let Some( skipper ) = self.skippers.pop() {
             self.skipper = skipper;
+            self.skip();
         }
     }
 

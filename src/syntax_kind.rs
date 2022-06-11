@@ -1,9 +1,37 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SyntaxKind {
+    Root,
     None,
 
     SourceFile,
+
+    TypeAlias,
+
+    Type,
+    TypeArray,
+    TypeTuple,
+    TypeRef,
+
+    GenericParams,
+    GenericParam,
+    GenericArgs,
+    GenericArg,
+
     Struct,
+    StructItems,
+    StructField,
+    StructMethod,
+
+    Enum,
+    EnumVariants,
+    EnumVariant,
+
+    TupleFields,
+    TupleField,
+
+    RecordFields,
+    RecordField,
+
     Fn,
     Block,
     If,
@@ -20,10 +48,9 @@ pub enum SyntaxKind {
     InlineNumber,
     InlineVar,
 
-    FnArgs,
-    FnArg,
+    FnParams,
+    FnParam,
     FnReturnType,
-    TypeRef,
 
     CallArgs,
     CallArg,
@@ -32,7 +59,7 @@ pub enum SyntaxKind {
     InlineField,
     InlineMethodCall,
 
-    InlineString,
-    InlineStringFragment,
-    InlineStringExpr,
+    String,
+    StringFragment,
+    StringExpr,
 }

@@ -51,6 +51,12 @@ impl < 'a > Lexer < 'a >{
         }
     }
 
+    fn at( &self, pos: usize ) -> Option< u8 > {
+        self.bytes
+            .get( pos )
+            .map( | x | *x )
+    }
+
     fn byte_is( &self, pos: usize, b: u8 ) -> bool {
         match self.bytes.get( pos) {
             Some( &x ) if x == b => true,
@@ -220,16 +226,24 @@ impl < 'a > Lexer < 'a >{
                 }
 
                 b'-' => {
-                    if self.byte_is( i, b'=' ) {
-                        ( T![ -= ], i + 1 )
-
-                    } else if self.byte_is( i, b'>' ) {
-                        ( T![ -> ], i + 1 )
-
-                    } else {
-                        ( T![ - ], i )
+                    match self.at( i ) {
+                        Some( b'=' ) => ( T![ -= ], i + 1 ),
+                        Some( b'>' ) => ( T![ -> ], i + 1 ),
+                        _ => ( T![ - ], i )
                     }
                 }
+
+                // b'-' => {
+                //     if self.byte_is( i, b'=' ) {
+                //         ( T![ -= ], i + 1 )
+
+                //     } else if self.byte_is( i, b'>' ) {
+                //         ( T![ -> ], i + 1 )
+
+                //     } else {
+                //         ( T![ - ], i )
+                //     }
+                // }
 
                 b'*' => {
                     if self.byte_is( i, b'=' ) {
@@ -274,69 +288,80 @@ impl < 'a > Lexer < 'a >{
                 b'&' => {
                     if self.byte_is( i, b'&' ) {
                         if self.byte_is( i + 1, b'=' ) {
-                            ( T![&&=], i + 2 )
+                            ( T![ &&= ], i + 2 )
+
                         } else {
-                            ( T![&&], i + 1 )
+                            ( T![ && ], i + 1 )
                         }
+
                     } else {
-                        ( T![&], i )
+                        ( T![ & ], i )
                     }
                 }
 
                 b'|' => {
-                    if self.byte_is( i, b'|' ) {
-                        if self.byte_is( i + 1, b'=' ) {
-                            ( T![||=], i + 2 )
-
-                        } else {
-                            ( T![||], i + 1 )
+                    match self.at( i ) {
+                        Some( b'|' ) => match self.at( i + 1 ) {
+                            Some( b'=' ) => ( T![ ||= ], i + 2 ),
+                            _ => ( T![ || ], i + 1 ),
                         }
-
-                    } else {
-                        ( T![|], i )
+                        _ => ( T![ | ], i ),
                     }
+
+                    // if self.byte_is( i, b'|' ) {
+                    //     if self.byte_is( i + 1, b'=' ) {
+                    //         ( T![ ||= ], i + 2 )
+
+                    //     } else {
+                    //         ( T![ || ], i + 1 )
+                    //     }
+
+                    // } else {
+                    //     ( T![ | ], i )
+                    // }
                 }
 
                 b'!' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![!=], i + 1 )
+                        ( T![ != ], i + 1 )
+
                     } else {
-                        ( T![!], i )
+                        ( T![ ! ], i )
                     }
                 }
 
                 b'.' => {
                     if self.byte_is( i, b'.' ) {
                         if self.byte_is( i + 1, b'.' ) {
-                            ( T![...], i + 2 )
+                            ( T![ ... ], i + 2 )
 
                         } else {
-                            ( T![..], i + 1 )
+                            ( T![ .. ], i + 1 )
                         }
 
                     } else {
-                        ( T![.], i )
+                        ( T![ . ], i )
                     }
                 }
 
-                b'(' => ( T!['('], i ),
-                b')' => ( T![')'], i ),
-                b'[' => ( T!['['], i ),
-                b']' => ( T![']'], i ),
-                b'{' => ( T!['{'], i ),
-                b'}' => ( T!['}'], i ),
-                b':' => ( T![:], i ),
-                b';' => ( T![;], i ),
-                b',' => ( T![,], i ),
-                b'@' => ( T![@], i ),
-                b'#' => ( T![#], i ),
-                b'^' => ( T![^], i ),
-                b'~' => ( T![~], i ),
-                b'?' => ( T![?], i ),
-                b'\'' => ( T!['\''], i ),
-                b'`' => ( T!['`'], i ),
-                b'$' => ( T![$], i ),
-                b'\\' => ( T!['\\'], i ),
+                b'(' => ( T![ '(' ], i ),
+                b')' => ( T![ ')' ], i ),
+                b'[' => ( T![ '[' ], i ),
+                b']' => ( T![ ']' ], i ),
+                b'{' => ( T![ '{' ], i ),
+                b'}' => ( T![ '}' ], i ),
+                b':' => ( T![ : ], i ),
+                b';' => ( T![ ; ], i ),
+                b',' => ( T![ , ], i ),
+                b'@' => ( T![ @ ], i ),
+                b'#' => ( T![ # ], i ),
+                b'^' => ( T![ ^ ], i ),
+                b'~' => ( T![ ~ ], i ),
+                b'?' => ( T![ ? ], i ),
+                b'\'' => ( T![ '\'' ], i ),
+                b'`' => ( T![ '`' ], i ),
+                b'$' => ( T![ $ ], i ),
+                b'\\' => ( T![ '\\' ], i ),
 
                 _ => ( TokenKind::Unknown, self.iterate_while( i, is_error ) ),
             }
@@ -389,13 +414,16 @@ fn is_error( b: u8 ) -> bool {
 
 fn id_or_keyword( id: &[ u8 ] ) -> TokenKind {
     match id {
-        b"struct" => T![struct],
-        b"const" => T![const],
-        b"let" => T![let],
-        b"if" => T![if],
-        b"for" => T![for],
-        b"while" => T![while],
-        b"fn" => T![fn],
+        b"type" => T![ type ],
+        b"struct" => T![ struct ],
+        b"enum" => T![ enum ],
+        b"const" => T![ const ],
+        b"let" => T![ let ],
+        b"if" => T![ if ],
+        b"for" => T![ for ],
+        b"while" => T![ while ],
+        b"fn" => T![ fn ],
         _ => TokenKind::Id,
     }
 }
+

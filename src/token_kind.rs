@@ -63,7 +63,9 @@ pub enum TokenKind {
     StringFragment,
     DollarOpenBrace,
 
+    Type,
     Struct,
+    Enum,
     Let,
     Const,
     Fn,
@@ -129,7 +131,9 @@ macro_rules !T {
 
     ["${"] => { TokenKind::DollarOpenBrace };
 
+    [type] => { TokenKind::Type };
     [struct] => { TokenKind::Struct };
+    [enum] => { TokenKind::Enum };
     [const] => { TokenKind::Const };
     [let] => { TokenKind::Let };
     [if] => { TokenKind::If };

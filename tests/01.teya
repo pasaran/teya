@@ -1,20 +1,3 @@
-fn add( x: number, y: number ) -> string
-    let x = 1
-    let y: number = ( 1 + 2 ).foo( x, y )
-
-    if x > 0
-        "Foo"
-
-    if y > 0
-        "Bar"
-        "Quu"
-
-    "Tee"
-
-    //  Comment
-
-fn sub()
-    "Foo"
-
-
-//  Comment
+fn add( x: number, y: number ) -> number {
+    x + y
+}

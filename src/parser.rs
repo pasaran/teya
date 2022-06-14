@@ -1,6 +1,6 @@
 use crate::{ Lexer, Token, TokenKind, T, SyntaxKind, ParserEvent, ParserError, ParserErrorKind, token_set::TokenSet };
 
-#[derive(Clone, Copy)]
+#[ derive( Clone, Copy ) ]
 pub enum Skipper {
     None,
     Inline,
@@ -116,7 +116,7 @@ impl < 'a > Parser< 'a > {
         // self.build_tree( node )
     }
 
-    pub fn finish( self ) -> Vec< ParserEvent< 'a > >  {
+    pub fn finish( self ) -> Vec< ParserEvent< 'a > > {
         self.events
     }
 
@@ -292,4 +292,3 @@ impl < 'a > Parser< 'a > {
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
-

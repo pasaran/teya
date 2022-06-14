@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::token_kind::{ TokenKind, T };
 
-#[derive(Clone,Copy)]
+#[ derive( Clone, Copy ) ]
 pub struct Token< 'a > {
     pub kind: TokenKind,
     pub text: &'a str,
@@ -19,14 +19,14 @@ impl < 'a > fmt::Debug for Token< 'a > {
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-#[derive(Copy,Clone,PartialEq,Debug)]
+#[ derive( Copy, Clone, PartialEq, Debug ) ]
 enum State {
     Normal,
     StringFragment,
     StringExpr,
 }
 
-#[derive(Clone)]
+#[ derive( Clone ) ]
 pub struct Lexer < 'a> {
     input: &'a str,
     bytes: &'a [ u8 ],
@@ -107,7 +107,7 @@ impl < 'a > Lexer < 'a >{
                     self.n_opened_curlies = 0;
                     self.opened_quotes.clear();
 
-                    return ( T!['"'], i );
+                    return ( T![ '"' ], i );
                 }
 
                 ( b'"', State::StringExpr ) => {
@@ -115,7 +115,7 @@ impl < 'a > Lexer < 'a >{
                     self.opened_quotes.push( self.n_opened_curlies );
                     self.n_opened_curlies = 0;
 
-                    return ( T!['"'], i );
+                    return ( T![ '"' ], i );
                 }
 
                 ( b'"', State::StringFragment ) => {
@@ -127,7 +127,7 @@ impl < 'a > Lexer < 'a >{
                         self.state = State::StringExpr;
                     }
 
-                    return ( T!['"'], i );
+                    return ( T![ '"' ], i );
                 }
 
                 ( b'$', State::StringFragment ) => {
@@ -135,14 +135,14 @@ impl < 'a > Lexer < 'a >{
                         self.state = State::StringExpr;
                         self.n_opened_curlies = 1;
 
-                        return ( T!["${"], i + 1 );
+                        return ( T![ "${" ], i + 1 );
                     }
                 }
 
                 ( b'{', State::StringExpr ) => {
                     self.n_opened_curlies += 1;
 
-                    return ( T!['{'], i );
+                    return ( T![ '{' ], i );
                 }
 
                 ( b'}', State::StringExpr ) => {
@@ -151,7 +151,7 @@ impl < 'a > Lexer < 'a >{
                         self.state = State::StringFragment;
                     }
 
-                    return ( T!['}'], i );
+                    return ( T![ '}' ], i );
                 }
 
                 ( b'\n', _ ) => {
@@ -197,8 +197,8 @@ impl < 'a > Lexer < 'a >{
                             }
                             ( TokenKind::Comment, i )
                         }
-                        Some( b'=' ) => ( T![/=], i + 1 ),
-                        _ => ( T![/], i ),
+                        Some( b'=' ) => ( T![ /= ], i + 1 ),
+                        _ => ( T![ / ], i ),
                     }
                 }
 
@@ -222,9 +222,9 @@ impl < 'a > Lexer < 'a >{
 
                 b'+' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![+=], i + 1 )
+                        ( T![ += ], i + 1 )
                     } else {
-                        ( T![+], i )
+                        ( T![ + ], i )
                     }
                 }
 
@@ -250,9 +250,9 @@ impl < 'a > Lexer < 'a >{
 
                 b'*' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![*=], i + 1 )
+                        ( T![ *= ], i + 1 )
                     } else {
-                        ( T![*], i )
+                        ( T![ * ], i )
                     }
                 }
 
@@ -260,31 +260,31 @@ impl < 'a > Lexer < 'a >{
                     if self.byte_is( i, b'=' ) {
                         ( T![ %= ], i + 1 )
                     } else {
-                        ( T![%], i )
+                        ( T![ % ], i )
                     }
                 }
 
                 b'=' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![==], i + 1 )
+                        ( T![ == ], i + 1 )
                     } else {
-                        ( T![=], i )
+                        ( T![ = ], i )
                     }
                 }
 
                 b'<' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![<=], i + 1 )
+                        ( T![ <= ], i + 1 )
                     } else {
-                        ( T![<], i )
+                        ( T![ < ], i )
                     }
                 }
 
                 b'>' => {
                     if self.byte_is( i, b'=' ) {
-                        ( T![>=], i + 1 )
+                        ( T![ >= ], i + 1 )
                     } else {
-                        ( T![>], i )
+                        ( T![ > ], i )
                     }
                 }
 
@@ -430,4 +430,3 @@ fn id_or_keyword( id: &[ u8 ] ) -> TokenKind {
         _ => TokenKind::Id,
     }
 }
-

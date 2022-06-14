@@ -5,18 +5,18 @@ use crate::{ SyntaxKind, Token, ParserError, SyntaxNode, SyntaxElement };
 #[ derive( Debug ) ]
 pub enum ParserEvent< 'a > {
 
-    Start{
+    Start {
         kind: SyntaxKind,
         forward_parent: Option< usize >,
     },
 
     Finish,
 
-    Token{
+    Token {
         token: Token< 'a >,
     },
 
-    Error{
+    Error {
         error: ParserError,
     },
 

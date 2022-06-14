@@ -1,4 +1,6 @@
+use crate::SyntaxNode;
 use crate::{ Lexer, Token, TokenKind, T, SyntaxKind, ParserEvent, ParserError, ParserErrorKind, token_set::TokenSet };
+use crate::parser_event::process;
 
 #[ derive( Clone, Copy ) ]
 pub enum Skipper {
@@ -105,45 +107,15 @@ impl < 'a > Parser< 'a > {
         }
     }
 
-    pub fn parse( &mut self, rule: fn ( parser: &mut Parser ) -> CompletedMarker ) {
-        let _node = rule( self );
+    pub fn parse( mut self, rule: fn ( parser: &mut Parser ) -> CompletedMarker ) -> SyntaxNode< 'a > {
+        let _node = rule( &mut self );
 
         for error in self.errors.iter() {
             println!( "{:?}", error );
         }
 
-        //  node
-        // self.build_tree( node )
+        process( self.events )
     }
-
-    pub fn finish( self ) -> Vec< ParserEvent< 'a > > {
-        self.events
-    }
-
-    // fn build_tree( &mut self, node: CompletedMarker ) -> SyntaxNode {
-    //     let mut tree = SyntaxNode::new( node.kind );
-
-    //     if node.children.is_empty() {
-    //         self.push_tokens( &mut tree, node.start, node.end + 1 );
-
-    //     } else {
-    //         let mut start = node.start;
-    //         for child in node.children {
-    //             self.push_tokens( &mut tree, start, child.start );
-    //             start = child.end + 1;
-    //             tree.push( SyntaxElement::Node( self.build_tree( child ) ) );
-    //         }
-    //         self.push_tokens( &mut tree, start, node.end + 1 );
-    //     }
-
-    //     tree
-    // }
-
-    // fn push_tokens( &self, tree: &mut SyntaxNode, start: usize, end: usize ) {
-    //     for token in &self.tokens[ start .. end ] {
-    //         tree.push( SyntaxElement::Token( *token ) );
-    //     }
-    // }
 
     pub fn push_event( &mut self, event: ParserEvent< 'a > ) {
         self.events.push( event );

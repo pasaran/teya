@@ -24,14 +24,14 @@ impl < 'a > SyntaxNode< 'a > {
             .collect()
     }
 
-    pub fn find_node( &'a self, kind: SyntaxKind ) -> Option< &'a SyntaxNode< 'a > > {
+    pub fn find_node( &'a self, kind: SyntaxKind, index: usize ) -> Option< &'a SyntaxNode< 'a > > {
         self.children
             .iter()
             .filter_map( | e | match e {
                 SyntaxElement::Node( node ) if node.kind == kind => Some( node ),
                 _ => None,
             } )
-            .nth( 0 )
+            .nth( index )
     }
 
     pub fn find_token( &'a self, kind: TokenKind ) -> Option< &'a Token< 'a > > {

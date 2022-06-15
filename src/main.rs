@@ -10,6 +10,7 @@ mod parser_event;
 mod ast;
 // mod test;
 
+
 pub use syntax_kind::{ SyntaxKind };
 pub use token_kind::{ TokenKind };
 pub use lexer::{ Lexer, Token };
@@ -34,10 +35,10 @@ fn main() {
     let root = Root::new( &node );
 
     let source_file = root.source_file().unwrap();
-    let fn0 = source_file.fn_( 0 ).unwrap();
+    let fn0 = source_file.fn0().unwrap();
     let name = fn0.name().unwrap();
     let id = name.id().unwrap();
 
     println!( "{:?}", node );
-    println!( "{:?}", id );
+    println!( "{}", id.text );
 }

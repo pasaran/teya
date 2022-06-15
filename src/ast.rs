@@ -12,7 +12,7 @@ impl < 'a > Root < 'a > {
         Root { node }
     }
 
-    pub fn SourceFile( &'a self ) -> Option< SourceFile< 'a > > {
+    pub fn source_file( &'a self ) -> Option< SourceFile< 'a > > {
         self.node.find_node( SyntaxKind::SourceFile )
             .map( | node | SourceFile { node } )
     }
@@ -27,14 +27,14 @@ pub struct SourceFile< 'a > {
 
 impl < 'a > SourceFile< 'a > {
 
-    pub fn Fns( &'a self, index: usize ) -> Vec< Fn< 'a > > {
+    pub fn fns( &'a self ) -> Vec< Fn< 'a > > {
         self.node.find_nodes( SyntaxKind::Fn )
             .iter()
             .map( | node | Fn { node } )
             .collect()
     }
 
-    pub fn Fn( &'a self, index: usize ) -> Option< Fn< 'a > > {
+    pub fn fn_( &'a self, index: usize ) -> Option< Fn< 'a > > {
         self.node.find_nodes( SyntaxKind::Fn )
             .iter()
             .map( | node | Fn { node } )
@@ -51,7 +51,7 @@ pub struct Fn< 'a > {
 
 impl < 'a > Fn < 'a > {
 
-    pub fn Name( &'a self ) -> Option< Name< 'a > > {
+    pub fn name( &'a self ) -> Option< Name< 'a > > {
         self.node.find_node( SyntaxKind::Name )
             .map( | node | Name { node } )
     }
@@ -66,7 +66,7 @@ pub struct Name< 'a > {
 
 impl < 'a > Name < 'a > {
 
-    pub fn Id( &'a self ) -> Option< &'a Token< 'a > > {
+    pub fn id( &'a self ) -> Option< &'a Token< 'a > > {
         self.node.find_token( TokenKind::Id )
     }
 

@@ -33,10 +33,10 @@ fn main() {
 
     let root = Root::new( &node );
 
-    let source_file = root.SourceFile().unwrap();
-    let fn0 = source_file.Fn( 0 ).unwrap();
-    let name = fn0.Name().unwrap();
-    let id = name.Id().unwrap();
+    let source_file = root.source_file().unwrap();
+    let fn0 = source_file.fn_( 0 ).unwrap();
+    let name = fn0.name().unwrap();
+    let id = name.id().unwrap();
 
     println!( "{:?}", node );
     println!( "{:?}", id );

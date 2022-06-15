@@ -5,6 +5,8 @@ pub enum SyntaxKind {
 
     SourceFile,
 
+    Name,
+
     TypeAlias,
 
     Type,

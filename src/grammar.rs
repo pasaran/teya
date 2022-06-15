@@ -298,14 +298,12 @@ fn r_fn( p: &mut Parser ) -> CompletedMarker {
     m.complete( p, SyntaxKind::Fn )
 }
 
-fn r_name( p: &mut Parser ) {
-    if p.is_kind( TokenKind::Id ) {
-        p.eat( TokenKind::Id );
+fn r_name( p: &mut Parser ) -> CompletedMarker {
+    let m = p.start();
 
-    } else {
-        p.error( ParserErrorKind::TokenRequired( TokenKind::Id ) );
-        p.eat_any();
-    }
+    p.expect( TokenKind::Id );
+
+    m.complete( p, SyntaxKind::Name )
 }
 
 fn r_fn_params( p: &mut Parser ) -> CompletedMarker {

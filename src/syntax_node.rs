@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{ SyntaxKind, Token };
+use crate::{ SyntaxKind, Token, TokenKind };
 
 pub enum SyntaxElement< 'a > {
     Node( SyntaxNode< 'a > ),
@@ -8,8 +8,42 @@ pub enum SyntaxElement< 'a > {
 }
 
 pub struct SyntaxNode< 'a > {
-    kind: SyntaxKind,
-    children: Vec< SyntaxElement< 'a > >,
+    pub kind: SyntaxKind,
+    pub children: Vec< SyntaxElement< 'a > >,
+}
+
+impl < 'a > SyntaxNode< 'a > {
+
+    pub fn find_nodes( &'a self, kind: SyntaxKind ) -> Vec< &'a SyntaxNode< 'a > > {
+        self.children
+            .iter()
+            .filter_map( | e | match e {
+                SyntaxElement::Node( node ) if node.kind == kind => Some( node ),
+                _ => None,
+            } )
+            .collect()
+    }
+
+    pub fn find_node( &'a self, kind: SyntaxKind ) -> Option< &'a SyntaxNode< 'a > > {
+        self.children
+            .iter()
+            .filter_map( | e | match e {
+                SyntaxElement::Node( node ) if node.kind == kind => Some( node ),
+                _ => None,
+            } )
+            .nth( 0 )
+    }
+
+    pub fn find_token( &'a self, kind: TokenKind ) -> Option< &'a Token< 'a > > {
+        self.children
+            .iter()
+            .filter_map( | e | match e {
+                SyntaxElement::Token( token ) if token.kind == kind => Some( token ),
+                _ => None,
+            } )
+            .nth( 0 )
+    }
+
 }
 
 impl < 'a >fmt::Debug for SyntaxNode< 'a > {

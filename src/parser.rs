@@ -219,10 +219,6 @@ impl < 'a > Parser< 'a > {
         Marker::new( pos )
     }
 
-    // pub fn end( &self, node: CompletedMarker, kind: SyntaxKind ) -> CompletedMarker {
-    //     node.end( self.last_eaten_token_pos, kind )
-    // }
-
     pub fn eol( &mut self ) {
         self.eat( TokenKind::EOL );
     }

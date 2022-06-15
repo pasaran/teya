@@ -1,8 +1,7 @@
 extern crate proc_macro;
 
 use proc_macro::{ TokenStream };
-use quote::{ quote, format_ident };
-// use syn::{ parse_macro_input, AttributeArgs, Lit, Meta, NestedMeta, LitInt, Token, token, bracketed };
+use quote::quote;
 use syn::parse::{ Parse, ParseStream, Result };
 use syn::punctuated::Punctuated;
 use syn::{ parse_macro_input, token, Token, bracketed, braced, Ident, LitInt };
@@ -125,6 +124,11 @@ pub fn ast( body: TokenStream ) -> TokenStream {
         }
 
         impl < 'a >#name < 'a > {
+
+            pub fn new( node: &'a SyntaxNode< 'a > ) -> Self {
+                #name { node }
+            }
+
             #(#fields)*
         }
 

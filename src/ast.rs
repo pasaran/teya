@@ -9,13 +9,13 @@ ast! {
     }
 }
 
-impl < 'a > Root < 'a > {
+// impl < 'a > Root < 'a > {
 
-    pub fn new( node: &'a SyntaxNode< 'a > ) -> Self {
-        Root { node }
-    }
+//     pub fn new( node: &'a SyntaxNode< 'a > ) -> Self {
+//         Root { node }
+//     }
 
-}
+// }
 
 ast! {
     SourceFile {

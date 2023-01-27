@@ -2,14 +2,25 @@ use crate::parser::{ Parser, CompletedMarker, Skipper };
 use crate::token_set::TokenSet;
 use crate::{ SyntaxKind, TokenKind, ParserErrorKind, T };
 
+fn error_block( p: &mut Parser, error_kind: ParserErrorKind ) {
+//     assert!(p.at(T!['{']));
+//     let m = p.start();
+//     p.error(message);
+//     p.bump(T!['{']);
+//     expressions::expr_block_contents(p);
+//     p.eat(T!['}']);
+//     m.complete(p, ERROR);
+}
+
 //  ---------------------------------------------------------------------------------------------------------------  //
 
 pub fn r_source_file( p: &mut Parser ) -> CompletedMarker {
-    p.set_skipper( Skipper::Block );
     let m = p.start();
 
-    while !p.is_eof() {
-        r_statement( p );
+    p.set_skipper( Skipper::Block );
+
+    while !p.at_eof() {
+        r_item( p );
     }
 
     p.expect( TokenKind::EOF );
@@ -17,32 +28,88 @@ pub fn r_source_file( p: &mut Parser ) -> CompletedMarker {
     m.complete( p, SyntaxKind::SourceFile )
 }
 
-fn r_statement( p: &mut Parser ) -> CompletedMarker {
-    match p.kind() {
-        Some( T![ fn ] ) => r_fn( p ),
-        Some( T![ type ] ) => r_type_alias( p ),
-        Some( T![ struct ] ) => r_struct( p ),
-        Some( T![ enum ] ) => r_enum( p ),
-        _ => unreachable!( "{:?}", p.kind() )
+//  ---------------------------------------------------------------------------------------------------------------  //
+
+const ITEM_RECOVERY_SET: TokenSet = TokenSet::new( &[
+    T![ fn ],
+    T![ type ],
+    T![ struct ],
+    T![ enum ],
+    T![ ; ],
+] );
+
+fn r_item( p: &mut Parser ) {
+    if r_opt_item( p ) {
+        return;
+    }
+
+    match p.current() {
+        // Some( T![ '{' ] ) => error_block( p, ParserErrorKind::ItemRequired ),
+
+        // Some( T![ '}' ] if !stop_on_r_curly => {
+        //     let e = p.start();
+        //     p.error("unmatched `}`");
+        //     p.bump(T!['}']);
+        //     e.complete(p, ERROR);
+        // }
+
+        TokenKind::EOF | T![ '}' ] => p.error( ParserErrorKind::ItemRequired ),
+
+        _ => p.error_and_bump( ParserErrorKind::ItemRequired ),
+    }
+}
+
+fn r_opt_item( p: &mut Parser ) -> bool {
+    match p.current() {
+        T![ fn ] => r_fn( p ),
+        T![ type ] => r_type_alias( p ),
+        T![ struct ] => r_struct( p ),
+        T![ enum ] => r_enum( p ),
+        _ => return false,
+    };
+
+    true
+}
+
+//  ---------------------------------------------------------------------------------------------------------------  //
+
+fn r_name( p: &mut Parser ) -> CompletedMarker {
+    let m = p.start();
+
+    p.expect( TokenKind::Id );
+
+    m.complete( p, SyntaxKind::Name )
+}
+
+fn r_name_rec( p: &mut Parser, recovery: TokenSet ) {
+    if p.at( TokenKind::Id ) {
+        let m = p.start();
+
+        p.expect( TokenKind::Id );
+
+        m.complete(p, SyntaxKind::Name );
+
+    } else {
+        p.error_recover( ParserErrorKind::NameRequired, recovery );
     }
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-fn r_generic_params( p: &mut Parser ) -> CompletedMarker {
+fn r_generic_params( p: &mut Parser ) {
     let m = p.start();
 
     assert!( p.eat( T![ < ] ) );
     loop {
-        match p.kind() {
-            Some( TokenKind::Id ) => r_generic_param( p ),
+        match p.current() {
+            TokenKind::Id => r_generic_param( p ),
             _ => break,
         };
         p.eat( T![ , ] );
     }
     p.expect( T![ > ] );
 
-    m.complete( p, SyntaxKind::GenericParams )
+    m.complete( p, SyntaxKind::GenericParams );
 }
 
 fn r_generic_param( p: &mut Parser ) -> CompletedMarker {
@@ -82,7 +149,7 @@ fn r_generic_arg( p: &mut Parser ) -> CompletedMarker {
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-fn r_type_alias( p: &mut Parser ) -> CompletedMarker {
+fn r_type_alias( p: &mut Parser ) {
     let m = p.start();
 
     assert!( p.eat( T![ type ] ) );
@@ -91,7 +158,7 @@ fn r_type_alias( p: &mut Parser ) -> CompletedMarker {
     p.expect( T![ = ] );
     r_type( p );
 
-    m.complete( p, SyntaxKind::TypeAlias)
+    m.complete( p, SyntaxKind::TypeAlias);
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
@@ -99,10 +166,10 @@ fn r_type_alias( p: &mut Parser ) -> CompletedMarker {
 fn r_type( p: &mut Parser ) -> CompletedMarker {
     let m = p.start();
 
-    match p.kind() {
-        Some( TokenKind::Id ) => r_typeref( p ),
-        Some( T![ '[' ] ) => r_type_array( p ),
-        Some( T![ '(' ] ) => r_type_tuple( p ),
+    match p.current() {
+        TokenKind::Id => r_typeref( p ),
+        T![ '[' ] => r_type_array( p ),
+        T![ '(' ] => r_type_tuple( p ),
         _ => unreachable!(),
     };
 
@@ -113,7 +180,7 @@ fn r_typeref( p: &mut Parser ) -> CompletedMarker {
     let m = p.start();
 
     p.eat( TokenKind::Id );
-    if p.is_kind( T![ < ] ) {
+    if p.at( T![ < ] ) {
         r_generic_args( p );
     }
 
@@ -142,16 +209,18 @@ fn r_type_tuple( p: &mut Parser ) -> CompletedMarker {
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-fn r_struct( p: &mut Parser ) -> CompletedMarker {
+fn r_struct( p: &mut Parser ) {
     let m = p.start();
 
     assert!( p.eat( T![ struct ] ) );
+    //  r_name( p );
+    r_name_rec( p, ITEM_RECOVERY_SET );
     r_struct_items( p );
-    if p.is_kind( T![ < ] ) {
+    if p.at( T![ < ] ) {
         r_generic_params( p );
     }
 
-    m.complete( p, SyntaxKind::Struct )
+    m.complete( p, SyntaxKind::Struct );
 }
 
 fn r_struct_items( p: &mut Parser ) -> CompletedMarker {
@@ -159,9 +228,9 @@ fn r_struct_items( p: &mut Parser ) -> CompletedMarker {
 
     p.expect( T![ '{'] );
     loop {
-        match p.kind() {
-            Some( TokenKind::Id ) => r_struct_field( p ),
-            Some( TokenKind::Fn ) => r_fn( p ),
+        match p.current() {
+            TokenKind::Id => r_struct_field( p ),
+            TokenKind::Fn => r_fn( p ),
             _ => break,
         };
         p.eat( T![ , ] );
@@ -171,33 +240,34 @@ fn r_struct_items( p: &mut Parser ) -> CompletedMarker {
     m.complete( p, SyntaxKind::StructItems )
 }
 
-fn r_struct_field( p: &mut Parser ) -> CompletedMarker {
+fn r_struct_field( p: &mut Parser ) {
     let m = p.start();
 
     assert!( p.eat( TokenKind::Id ) );
     p.expect( T![ : ] );
     r_type( p );
-    if p.is_kind( T![ = ] ) {
+    if p.at( T![ = ] ) {
         p.eat( T![ = ] );
         r_expr( p );
     }
 
-    m.complete( p, SyntaxKind::StructField )
+    m.complete( p, SyntaxKind::StructField );
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-fn r_enum( p: &mut Parser ) -> CompletedMarker {
+fn r_enum( p: &mut Parser ) {
     let m = p.start();
 
     assert!( p.eat( T![ enum ] ) );
-    r_name( p );
-    if p.is_kind( T![ < ] ) {
+    // . r_name( p );
+    r_name_rec( p, ITEM_RECOVERY_SET );
+    if p.at( T![ < ] ) {
         r_generic_params( p );
     }
     r_enum_variants( p );
 
-    m.complete( p, SyntaxKind::Enum )
+    m.complete( p, SyntaxKind::Enum );
 }
 
 fn r_enum_variants( p: &mut Parser ) -> CompletedMarker {
@@ -205,14 +275,14 @@ fn r_enum_variants( p: &mut Parser ) -> CompletedMarker {
 
     p.expect( T![ '{' ] );
     loop {
-        match p.kind() {
-            Some( TokenKind::Id ) => {
+        match p.current() {
+            TokenKind::Id => {
                 let m = p.start();
 
                 r_name( p );
-                match p.nth_kind( 1 ) {
-                    Some( T![ '(' ] ) => { r_tuple_fields( p ); },
-                    Some( T![ '{' ] ) => { r_record_fields( p ); },
+                match p.current() {
+                    T![ '(' ] => { r_tuple_fields( p ); },
+                    T![ '{' ] => { r_record_fields( p ); },
                     _ => {},
                 };
 
@@ -236,8 +306,8 @@ fn r_tuple_fields( p: &mut Parser ) -> CompletedMarker {
 
     p.expect( T![ '(' ] );
     loop {
-        match p.kind() {
-            Some( TokenKind::Id ) => r_tuple_field( p ),
+        match p.current() {
+            TokenKind::Id => r_tuple_field( p ),
             _ => break,
         };
         p.eat( T![ , ] );
@@ -261,8 +331,8 @@ fn r_record_fields( p: &mut Parser ) -> CompletedMarker {
 
     p.expect( T![ '{' ] );
     loop {
-        match p.kind() {
-            Some( TokenKind::Id ) => r_record_field( p ),
+        match p.current() {
+            TokenKind::Id => r_record_field( p ),
             _ => break,
         };
         p.eat( T![ , ] );
@@ -284,39 +354,39 @@ fn r_record_field( p: &mut Parser ) -> CompletedMarker {
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-fn r_fn( p: &mut Parser ) -> CompletedMarker {
+fn r_fn( p: &mut Parser ) {
     let m = p.start();
 
     assert!( p.eat( T![ fn ] ) );
-    r_name( p );
+    r_name_rec( p, ITEM_RECOVERY_SET );
     r_fn_params( p );
-    if p.is_kind( T![ -> ] ) {
-        r_fn_return_type( p );
-    }
+    r_opt_fn_return_type( p );
     r_block( p );
 
-    m.complete( p, SyntaxKind::Fn )
+    m.complete( p, SyntaxKind::Fn );
 }
 
-fn r_name( p: &mut Parser ) -> CompletedMarker {
-    let m = p.start();
+fn r_fn_params( p: &mut Parser ) {
+    if p.at( T![ '(' ] ) {
+        let m = p.start();
 
-    p.expect( TokenKind::Id );
+        p.eat( T![ '(' ] );
+        while !p.at_eof() && !p.at( T![ ')' ] ) {
+            r_fn_param( p );
 
-    m.complete( p, SyntaxKind::Name )
-}
+            p.eat( T![ , ] );
+            // if !p.at_eof() {
+            //     p.expect( T![ , ] );
+            // }
+        }
+        p.expect( T![ ')' ] );
 
-fn r_fn_params( p: &mut Parser ) -> CompletedMarker {
-    let m = p.start();
+        m.complete( p, SyntaxKind::FnParams );
 
-    p.expect( T![ '(' ] );
-    while !p.is_eol() && !p.is_kind( T![ ')' ] ) {
-        r_fn_param( p );
-        p.eat( T![ , ] );
+    } else {
+        p.error( ParserErrorKind::FunctionArgumentsExpected );
     }
-    p.expect( T![ ')' ] );
 
-    m.complete( p, SyntaxKind::FnParams )
 }
 
 fn r_fn_param( p: &mut Parser ) -> CompletedMarker {
@@ -329,13 +399,15 @@ fn r_fn_param( p: &mut Parser ) -> CompletedMarker {
     m.complete( p, SyntaxKind::FnParam )
 }
 
-fn r_fn_return_type( p: &mut Parser ) -> CompletedMarker {
-    let m = p.start();
+fn r_opt_fn_return_type( p: &mut Parser ) {
+    if p.at( T![ -> ] ) {
+        let m = p.start();
 
-    p.eat( T![ -> ] );
-    r_type( p );
+        p.eat( T![ -> ] );
+        r_type( p );
 
-    m.complete( p, SyntaxKind::FnReturnType )
+        m.complete( p, SyntaxKind::FnReturnType );
+    }
 }
 
 
@@ -343,8 +415,9 @@ fn r_let( p: &mut Parser ) -> CompletedMarker {
     let m = p.start();
 
     assert!( p.eat( T![ let ] ) );
-    p.eat( TokenKind::Id );
-    if p.is_kind( T![ : ] ) {
+    r_name( p );
+    //  p.eat( TokenKind::Id );
+    if p.at( T![ : ] ) {
         p.eat( T![ : ] );
         r_type( p );
     }
@@ -386,14 +459,14 @@ fn r_inline_expr( p: &mut Parser ) -> CompletedMarker {
     m
 }
 
-fn infix_binding_power( kind: Option< TokenKind > ) -> Option< ( i8, i8 ) > {
+fn infix_binding_power( kind: TokenKind ) -> Option< ( i8, i8 ) > {
     match kind {
-        Some( T![ || ] ) => Some( ( 1, 2 ) ),
-        Some( T![ && ] ) => Some( ( 3, 4 ) ),
-        Some( T![ == ] | T![ != ] ) => Some( ( 5, 6 ) ),
-        Some( T![ < ] | T![ <= ] | T![ > ] | T![ >= ] ) => Some( ( 7, 8 ) ),
-        Some( T![ + ] | T![ - ] ) => Some( ( 9, 10 ) ),
-        Some( T![ * ] | T![ / ] | T![ % ] ) => Some( ( 11, 12 ) ),
+        T![ || ] => Some( ( 1, 2 ) ),
+        T![ && ] => Some( ( 3, 4 ) ),
+        T![ == ] | T![ != ] => Some( ( 5, 6 ) ),
+        T![ < ] | T![ <= ] | T![ > ] | T![ >= ] => Some( ( 7, 8 ) ),
+        T![ + ] | T![ - ] => Some( ( 9, 10 ) ),
+        T![ * ] | T![ / ] | T![ % ] => Some( ( 11, 12 ) ),
         _ => None,
     }
 }
@@ -401,7 +474,7 @@ fn infix_binding_power( kind: Option< TokenKind > ) -> Option< ( i8, i8 ) > {
 fn r_inline_binary( p: &mut Parser, min_bp: i8 ) -> CompletedMarker {
     let mut left = r_inline_unary( p );
 
-    while let Some ( ( left_bp, right_bp ) ) = infix_binding_power( p.kind() ) {
+    while let Some ( ( left_bp, right_bp ) ) = infix_binding_power( p.current() ) {
         if left_bp < min_bp {
             break;
 
@@ -419,8 +492,8 @@ fn r_inline_binary( p: &mut Parser, min_bp: i8 ) -> CompletedMarker {
 }
 
 fn r_inline_unary( p: &mut Parser ) -> CompletedMarker {
-    match p.kind() {
-        Some( T![ + ] | T![ - ] |  T![ ! ] ) => {
+    match p.current() {
+        T![ + ] | T![ - ] |  T![ ! ] => {
             let m = p.start();
             p.eat_any();
             r_inline_unary( p );
@@ -431,21 +504,21 @@ fn r_inline_unary( p: &mut Parser ) -> CompletedMarker {
 }
 
 fn r_inline_primary( p: &mut Parser ) -> CompletedMarker {
-    let mut expr = match p.kind() {
-        Some( T![ '(' ] ) => r_inline_subexpr( p ),
-        Some( TokenKind::Number ) => r_inline_number( p ),
-        Some( TokenKind::Id ) => r_inline_var( p ),
-        Some( T![ '"' ] ) => r_string( p ),
+    let mut expr = match p.current() {
+        T![ '(' ] => r_inline_subexpr( p ),
+        TokenKind::Number => r_inline_number( p ),
+        TokenKind::Id => r_inline_var( p ),
+        T![ '"' ] => r_string( p ),
         _ => unreachable!(),
     };
 
     loop {
-        if p.is_kind( T![ . ] ) {
+        if p.at( T![ . ] ) {
             let m = expr.precede( p );
             p.eat( T![ . ] );
             p.eat( TokenKind::Id );
 
-            if p.is_kind( T![ '(' ] ) {
+            if p.at( T![ '(' ] ) {
                 r_inline_args( p );
 
                 expr = m.complete( p, SyntaxKind::InlineMethodCall );
@@ -454,7 +527,7 @@ fn r_inline_primary( p: &mut Parser ) -> CompletedMarker {
                 expr = m.complete( p, SyntaxKind::InlineField );
             }
 
-        } else if p.is_kind( T![ '(' ] ) {
+        } else if p.at( T![ '(' ] ) {
             let m = expr.precede( p );
 
             r_inline_args( p );
@@ -497,7 +570,7 @@ fn r_inline_args( p: &mut Parser ) -> CompletedMarker {
     let m = p.start();
 
     assert!( p.eat( T![ '(' ] ) );
-    while !p.is_kind( T![ ')' ] ) && !p.is_eol() {
+    while !p.at( T![ ')' ] ) && !p.at_eol() {
         r_inline_arg( p );
         p.eat( T![ , ] );
     }
@@ -521,13 +594,13 @@ fn r_string( p: &mut Parser ) -> CompletedMarker {
 
     assert!( p.eat( T![ '"' ] ) );
 
-    while !p.is_eol() && !p.is_kind( T![ '"' ] ){
-        match p.kind() {
-            Some( TokenKind::StringFragment ) => {
+    while !p.at_eol() && !p.at( T![ '"' ] ){
+        match p.current() {
+            TokenKind::StringFragment => {
                 r_string_fragment( p );
             }
 
-            Some( TokenKind::DollarOpenBrace ) => {
+            TokenKind::DollarOpenBrace => {
                 r_string_expr( p );
             }
 
@@ -574,7 +647,7 @@ fn r_block( p: &mut Parser ) -> CompletedMarker {
     p.set_skipper( Skipper::Block );
 
     p.expect( T![ '{' ] );
-    while !p.is_eof() && !p.is_kind( T![ '}' ] ) {
+    while !p.at_eof() && !p.at( T![ '}' ] ) {
         r_block_statement( p );
     }
     p.eat( T![ '}' ] );
@@ -593,10 +666,10 @@ fn r_expr( p: &mut Parser ) -> CompletedMarker {
 }
 
 fn r_block_statement( p: &mut Parser ) -> CompletedMarker {
-    match p.kind() {
-        Some( T![ if ] ) => r_if( p ),
-        Some( T![ while ] ) => r_while( p ),
-        Some( T![ let ] ) => r_let( p ),
+    match p.current() {
+        T![ if ] => r_if( p ),
+        T![ while ] => r_while( p ),
+        T![ let ] => r_let( p ),
         _ => r_expr( p ),
     }
 }

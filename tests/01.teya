@@ -1,3 +1,13 @@
 fn add( x: number, y: number ) -> number {
     x + y
 }
+
+struct Foo {
+    x: number,
+    y: number,
+}
+
+fn sub( x: number, y: number ) -> number {
+    x - y
+}
+

@@ -2,8 +2,11 @@
 pub enum SyntaxKind {
     Root,
     None,
+    Error,
 
     SourceFile,
+
+    Item,
 
     Name,
 

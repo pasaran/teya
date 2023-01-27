@@ -35,9 +35,9 @@ impl Marker {
         CompletedMarker::new(self.pos, kind)
     }
 
-    // pub fn cancel( self, p: &mut Parser ) {
-
-    // }
+    pub fn abandon( self, p: &mut Parser ) {
+        //  TODO.
+    }
 
 }
 
@@ -78,7 +78,7 @@ pub struct Parser< 'a > {
     pub tokens: Vec< Token< 'a > >,
 
     events: Vec< ParserEvent< 'a > >,
-    errors: Vec< ParserError >,
+    // errors: Vec< ParserError >,
 
     pos: usize,
 
@@ -96,7 +96,7 @@ impl < 'a > Parser< 'a > {
             tokens: Lexer::new( input ).collect(),
 
             events: vec![],
-            errors: vec![],
+            // errors: vec![],
 
             pos: 0,
 
@@ -109,10 +109,6 @@ impl < 'a > Parser< 'a > {
 
     pub fn parse( mut self, rule: fn ( parser: &mut Parser ) -> CompletedMarker ) -> SyntaxNode< 'a > {
         let _node = rule( &mut self );
-
-        for error in self.errors.iter() {
-            println!( "{:?}", error );
-        }
 
         process( self.events )
     }
@@ -128,42 +124,58 @@ impl < 'a > Parser< 'a > {
         self.push_event( error );
     }
 
-    // pub fn error_and_mov( &mut self, kind: ParserErrorKind ) {
-    //     self.error( kind );
-    //     self.eat_any();
-    // }
+    pub fn error_and_bump( &mut self, kind: ParserErrorKind ) {
+        self.error( kind );
+        self.eat_any();
+    }
+
+    pub fn error_recover( &mut self, error_kind: ParserErrorKind, recovery: TokenSet ) {
+        match self.current() {
+            T![ '{' ] | T![ '}' ] => {
+                self.error( error_kind );
+                return;
+            }
+            _ => (),
+        }
+
+        if self.at_ts( recovery ) {
+            self.error( error_kind );
+
+            return;
+        }
+
+        let m = self.start();
+        self.error( error_kind );
+        self.eat_any();
+        m.complete(self, SyntaxKind::Error );
+    }
 
     pub fn nth( &self, n: usize ) -> Option< &Token > {
         self.tokens.get( self.pos + n )
     }
 
-    pub fn nth_kind( &self, n: usize ) -> Option< TokenKind > {
-        self.nth( n ).map( | t | t.kind )
+    pub fn nth_kind( &self, n: usize ) -> TokenKind {
+        self.nth( n ).map_or( TokenKind::EOF, | t | t.kind )
     }
 
-    pub fn kind( &self ) -> Option< TokenKind > {
+    pub fn current( &self ) -> TokenKind {
         self.nth_kind( 0 )
     }
 
+    pub fn at( &self, kind: TokenKind ) -> bool {
+        self.nth_kind( 0 ) == kind
+    }
+
     pub fn at_ts( &self, ts: TokenSet ) -> bool {
-        if let Some( kind ) = self.kind() {
-            ts.contains( kind )
-
-        } else {
-            false
-        }
+        ts.contains( self.current() )
     }
 
-    pub fn is_kind( &self, kind: TokenKind ) -> bool {
-        self.nth( 0 ).map_or( false, | t | t.kind == kind )
+    pub fn at_eof( &self ) -> bool {
+        self.at( TokenKind::EOF )
     }
 
-    pub fn is_eof( &self ) -> bool {
-        self.is_kind( TokenKind::EOF )
-    }
-
-    pub fn is_eol( &self ) -> bool {
-        self.is_kind( TokenKind::EOL )
+    pub fn at_eol( &self ) -> bool {
+        self.at( TokenKind::EOL )
     }
 
     pub fn mov( &mut self ) {
@@ -173,15 +185,15 @@ impl < 'a > Parser< 'a > {
     }
 
     pub fn eat( &mut self, kind: TokenKind ) -> bool {
-        if let Some( &t ) = self.nth( 0 ) {
-            if t.kind == kind {
-                // println!( "eaten={:?}", kind );
+        if self.nth_kind( 0 ) == kind {
+            // println!( "eaten={:?}", kind );
+            if kind != TokenKind::EOF {
                 self.last_eaten_token_pos = self.pos;
                 self.mov();
                 self.skip();
-
-                return true;
             }
+
+            return true;
         }
 
         false
@@ -242,14 +254,14 @@ impl < 'a > Parser< 'a > {
             Skipper::None => {},
 
             Skipper::Inline => {
-                while self.is_kind( T![ ] ) {
+                while self.at( T![ ] ) {
                     // println!( "skipped {:?}", self.kind() );
                     self.mov();
                 }
             }
 
             Skipper::Block => {
-                while self.is_kind( T![ ] ) || self.is_kind( TokenKind::EOL ) || self.is_kind( TokenKind::Comment ) {
+                while self.at( T![ ] ) || self.at( TokenKind::EOL ) || self.at( TokenKind::Comment ) {
                     // println!( "skipped {:?}", self.kind() );
                     self.mov();
                 }

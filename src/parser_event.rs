@@ -81,7 +81,9 @@ pub fn process( mut events: Vec< ParserEvent > ) -> SyntaxNode {
                 root.push( SyntaxElement::Token( token ) );
             }
 
-            ParserEvent::Error { error } => (),//res.error( kind ),
+            ParserEvent::Error { error } => {
+                println!( "{:?}", error );
+            }
         }
     }
 

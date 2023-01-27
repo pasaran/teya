@@ -33,7 +33,6 @@ pub struct Lexer < 'a> {
 
     pos: usize,
 
-    prev_kind: TokenKind,
     state: State,
     n_opened_curlies: u32,
     opened_quotes: Vec< u32 >,
@@ -47,7 +46,6 @@ impl < 'a > Lexer < 'a >{
             bytes: input.as_bytes(),
             pos: 0,
 
-            prev_kind: TokenKind::None,
             state: State::Normal,
             n_opened_curlies: 0,
             opened_quotes: Vec::new(),
@@ -90,11 +88,7 @@ impl < 'a > Lexer < 'a >{
         let pos = self.pos;
 
         if pos >= bytes.len() {
-            return match self.prev_kind {
-                TokenKind::EOF => ( TokenKind::None, pos ),
-                TokenKind::EOL => ( TokenKind::EOF, pos ),
-                _ => ( TokenKind::EOL, pos ),
-            };
+            return ( TokenKind::None, pos );
 
         } else {
             let b = bytes.get( pos ).unwrap();
@@ -383,7 +377,6 @@ impl < 'a > Iterator for Lexer < 'a > {
             return None;
         }
 
-        self.prev_kind = kind;
         self.pos = end;
 
         Some( Token {

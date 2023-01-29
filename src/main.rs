@@ -38,18 +38,18 @@ fn main() {
     let root = ast::Root::cast( &node ).unwrap();
 
     root.walk( | x: &ast::Fn | {
-        println!( "{:?}", x.name.as_ref().unwrap().id().unwrap() );
+        // println!( "{:?}", x.name.as_ref().unwrap().id().unwrap() );
     } );
 
-    let source_file = root.source_file.unwrap();
-    let item0 = source_file.items.get( 0 ).unwrap();
-    if let ast::Item::Fn( fn0 ) = item0 {
-        let name = fn0.name.as_ref().unwrap();
-        let id = name.id().unwrap();
+    // let source_file = root.source_file.unwrap();
+    // let item0 = source_file.items.get( 0 ).unwrap();
+    // if let ast::Item::Fn( fn0 ) = item0 {
+    //     let name = fn0.name.as_ref().unwrap();
+    //     let id = name.id().unwrap();
 
         // println!( "{:?}", node );
-        println!( "{}", id.text );
-    }
+    //     println!( "{}", id.text );
+    // }
 
     // let fn0 = ast::Fn::cast( item0 ).unwrap();
     // let name = fn0.name().unwrap();

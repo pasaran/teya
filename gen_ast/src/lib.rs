@@ -1,10 +1,13 @@
 extern crate proc_macro;
 
+use std::collections::{HashMap, HashSet};
+
 use proc_macro::TokenStream;
-use quote::quote;
+use proc_macro2;
+use quote::{quote, format_ident};
 use syn::parse::{ Parse, ParseStream, Result };
 use syn::punctuated::Punctuated;
-use syn::{ parse_macro_input, token, Token, bracketed, braced, Ident, LitInt, parenthesized };
+use syn::{ parse_macro_input, token, Token, braced, Ident, parenthesized };
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
@@ -25,6 +28,29 @@ struct AstUnion {
 struct AstRecord {
     name: Ident,
     fields: Punctuated< AstRecordField, Token![ , ] >,
+}
+
+//  ---------------------------------------------------------------------------------------------------------------  //
+
+struct AstRecordField {
+    name: Ident,
+    type_: AstRecordFieldType,
+}
+
+//  ---------------------------------------------------------------------------------------------------------------  //
+
+enum AstRecordFieldType {
+    //  #Foo
+    Token( Ident ),
+
+    //  #( Foo | Bar )
+    Tokens( Punctuated< Ident, Token![ | ] > ),
+
+    //  *Foo
+    Nodes( Ident ),
+
+    //  Foo
+    Node( Ident ),
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
@@ -59,11 +85,6 @@ impl Parse for Ast {
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
-struct AstRecordField {
-    name: Ident,
-    type_: AstRecordFieldType,
-}
-
 impl Parse for AstRecordField {
 
     fn parse( input: ParseStream ) -> Result< Self > {
@@ -79,18 +100,7 @@ impl Parse for AstRecordField {
 
 }
 
-enum AstRecordFieldType {
-    //  #Foo
-    Token( Ident ),
-    //  #( Foo | Bar )
-    Tokens( Punctuated< Ident, Token![ | ] > ),
-    //  *Foo
-    Nodes( Ident ),
-    //  Foo
-    Node( Ident ),
-    //  Foo[ 0 ]
-    NodeIndex( Ident, LitInt ),
-}
+//  ---------------------------------------------------------------------------------------------------------------  //
 
 impl Parse for AstRecordFieldType {
 
@@ -119,16 +129,7 @@ impl Parse for AstRecordFieldType {
         }
 
         let ident: Ident = input.parse()?;
-        if input.peek( token::Bracket ) {
-            let content;
-            let _: token::Bracket = bracketed!( content in input );
-            let index: LitInt = content.parse()?;
-
-            return Ok( AstRecordFieldType::NodeIndex( ident, index ) );
-
-        } else {
-            return Ok( AstRecordFieldType::Node( ident ) );
-        }
+        return Ok( AstRecordFieldType::Node( ident ) );
     }
 
 }
@@ -150,192 +151,148 @@ pub fn ast( body: TokenStream ) -> TokenStream {
 //  ---------------------------------------------------------------------------------------------------------------  //
 
 fn ast_union( ast: AstUnion ) -> TokenStream {
-    let name = ast.name;
+    let name = &ast.name;
 
-    let enum_items = ast.items
-        .iter()
-        .map( | item | quote! {
-            #item ( #item< 'a > )
-        } );
+    let enum_def = get_enum_def( &ast );
 
-    let can_cast_items = ast.items
-        .iter()
-        .map( | item | quote! {
-            SyntaxKind::#item => true,
-        } );
-
-    let cast_items = ast.items
-        .iter()
-        .map( | item | quote! {
-            SyntaxKind::#item => #name::#item( #item { node } ),
-        } );
-
-    let walk_items = ast.items
-        .iter()
-        .map( | item | quote! {
-            #name::#item( x ) => x.walk( callback ),
-        } );
-
-    let syntax_items = ast.items
-        .iter()
-        .map( | item | quote! {
-            #name::#item( x ) => &x.syntax(),
-        } );
+    let syntax_method = get_syntax_method( &ast );
+    let can_cast_method = get_can_cast_method( &ast );
+    let cast_method = get_cast_method( &ast );
+    let walk_method = get_walk_method( &ast );
 
     let r = quote! {
-        pub enum #name < 'a > {
-            #( #enum_items ),*
-        }
+        #enum_def
 
         impl < 'a > AstNode< 'a > for #name< 'a > {
 
-            fn syntax( &self ) -> &SyntaxNode< 'a > {
-                match self {
-                    #( #syntax_items )*
-                }
+            fn kind() -> SyntaxKind {
+                SyntaxKind::#name
             }
 
-            fn can_cast( kind: SyntaxKind ) -> bool {
-                match kind {
-                    #( #can_cast_items )*
-                    _ => false,
-                }
-            }
-
-            fn cast( node: &'a SyntaxNode< 'a > ) -> Option< Self > {
-                let r = match node.kind {
-                    #( #cast_items )*
-                    _ => return None,
-                };
-
-                Some( r )
-            }
-
-            fn walk< T >( &'a self, callback: fn( &'a T ) ) where T: AstNode< 'a > {
-                match self {
-                    #( #walk_items )*
-                }
-            }
-
+            #syntax_method
+            #can_cast_method
+            #cast_method
+            #walk_method
         }
     };
 
-    r.into()
+    return r.into();
+
+    fn get_enum_def( ast: &AstUnion ) -> proc_macro2::TokenStream {
+        let name = &ast.name;
+
+        let items = ast.items
+            .iter()
+            .map( | item | quote! {
+                #item ( #item< 'a > ),
+            } );
+
+        quote! {
+            pub enum #name < 'a > {
+                #( #items )*
+            }
+        }
+    }
+
+    fn get_syntax_method( ast: &AstUnion ) -> proc_macro2::TokenStream {
+        let name = &ast.name;
+
+        let items = ast.items
+            .iter()
+            .map( | item | quote! {
+                #name::#item( x ) => &x.syntax(),
+            } );
+
+        quote! {
+            fn syntax( &'a self ) -> &SyntaxNode< 'a > {
+                match self {
+                    #( #items )*
+                }
+            }
+        }
+    }
+
+    fn get_can_cast_method( ast: &AstUnion ) -> proc_macro2::TokenStream {
+        let items = ast.items
+            .iter()
+            .map( | item | quote! {
+                SyntaxKind::#item => true,
+            } );
+
+        quote!{
+            fn can_cast( kind: SyntaxKind ) -> bool {
+                match kind {
+                    #( #items )*
+                    _ => false,
+                }
+            }
+        }
+    }
+
+    fn get_cast_method( ast: &AstUnion ) -> proc_macro2::TokenStream {
+        let name = &ast.name;
+
+        let items = ast.items
+            .iter()
+            .map( | item | quote! {
+                if let Some( x ) = #item::cast( node ) {
+                    return Some( #name::#item( x ) );
+                }
+            } );
+
+        quote!{
+            fn cast( node: &'a SyntaxNode< 'a > ) -> Option< Self > {
+                #( #items )*
+
+                return None;
+            }
+        }
+    }
+
+    fn get_walk_method( ast: &AstUnion ) -> proc_macro2::TokenStream {
+        let name = &ast.name;
+
+        let items = ast.items
+            .iter()
+            .map( | item | quote! {
+                #name::#item( x ) => x.walk( callback ),
+            } );
+
+        quote!{
+            fn walk< T >( &'a self, callback: fn( &'a T ) ) where T: AstNode< 'a > {
+                match self {
+                    #( #items )*
+                }
+                if T::kind() == Self::kind() {
+                    let x = unsafe { std::mem::transmute::< &Self, &T >( self ) };
+                    callback( x );
+                }
+            }
+        }
+    }
+
 }
 
 //  ---------------------------------------------------------------------------------------------------------------  //
 
 fn ast_record( ast: AstRecord ) -> TokenStream {
-    let fields = ast.fields
-        .iter()
-        .map( | field | {
-            let field_name = &field.name;
+    let name = &ast.name;
 
-            match &field.type_ {
+    let struct_def = get_struct_def( &ast );
 
-                AstRecordFieldType::Tokens( tokens ) => {
-                    let tokens = tokens.iter();
+    let cast_method = get_cast_method( &ast );
+    let walk_method = get_walk_method( &ast );
 
-                    quote! {
-                        pub fn #field_name( &'a self ) -> Option< &'a Token< 'a > > {
-                            let ts = TokenSet::new( &[ #( TokenKind::#tokens ),* ] );
-                                self.node.find_token_in_set( ts )
-                        }
-                    }
-                },
-
-                AstRecordFieldType::Token( token ) => {
-                    quote! {
-                        pub fn #field_name( &'a self ) -> Option< &'a Token< 'a > > {
-                            self.node.find_token( TokenKind::#token )
-                        }
-                    }
-                },
-
-                AstRecordFieldType::Node( id ) => quote! {
-                    pub fn #field_name( &'a self ) -> Option< #id< 'a > > {
-                        self.node.find_node_by_index( SyntaxKind::#id, 0 )
-                            .map( | node | #id { node } )
-                    }
-                },
-
-                AstRecordFieldType::NodeIndex( id, index ) => quote! {
-                    pub fn #field_name( &'a self ) -> Option< #id< 'a > > {
-                        self.node.find_node_by_index( SyntaxKind::#id, #index )
-                            .map( | node | #id { node } )
-                    }
-                },
-
-                AstRecordFieldType::Nodes( id ) => quote! {
-                    pub fn #field_name( &'a self ) -> Vec< #id< 'a > > {
-                        self.node.children
-                            .iter()
-                            .filter_map( | e | {
-                                match e {
-                                    SyntaxElement::Node( node ) => #id::cast( node ),
-                                    _ => None,
-                                }
-                            } )
-                            .collect()
-
-                        // self.node.find_nodes( SyntaxKind::#id )
-                        //     .iter()
-                        //     .map( | node | #id { node } )
-                        //     .collect()
-                    }
-                },
-
-            }
-        } );
-
-    let walk_items = ast.fields
-        .iter()
-        .map( | field | {
-            let field_name = &field.name;
-
-            match &field.type_ {
-
-                AstRecordFieldType::Node( _ ) |
-                AstRecordFieldType::NodeIndex( _, _ ) => quote! {
-                    if let Some( t ) = self.#field_name() {
-                        let node = t.syntax();
-                        if let Some( ast ) = T::cast( node ) {
-                            ast.walk( callback );
-                            callback( &ast );
-                        }
-                    }
-                },
-
-                AstRecordFieldType::Nodes( _ ) => quote! {
-                    self.#field_name()
-                        .iter()
-                        .for_each( | x | {
-                            let node = x.syntax();
-                            if let Some( ast ) = T::cast( node ) {
-                                ast.walk( callback );
-                                callback( &ast );
-                            }
-                        } );
-                },
-
-                _ => quote! {},
-
-            }
-        } );
-
-    let name = ast.name;
     let r = quote! {
-        pub struct #name < 'a > {
-            node: &'a SyntaxNode< 'a >,
-        }
-
-        impl < 'a > #name< 'a > {
-            #( #fields )*
-        }
+        #struct_def
 
         impl < 'a > AstNode< 'a > for #name< 'a > {
 
-            fn syntax( &self ) -> &SyntaxNode< 'a > {
+            fn kind() -> SyntaxKind {
+                SyntaxKind::#name
+            }
+
+            fn syntax( &'a self ) -> &SyntaxNode< 'a > {
                 &self.node
             }
 
@@ -343,20 +300,164 @@ fn ast_record( ast: AstRecord ) -> TokenStream {
                 SyntaxKind::#name == kind
             }
 
+            #cast_method
+            #walk_method
+        }
+    };
+
+    return r.into();
+
+    fn get_struct_def( ast: &AstRecord ) -> proc_macro2::TokenStream {
+        let struct_items = ast.fields
+            .iter()
+            .map( | field | {
+                let field_name = &field.name;
+
+                match &field.type_ {
+                    AstRecordFieldType::Nodes( id ) => {
+                        quote! {
+                            pub #field_name: Vec< #id< 'a > >,
+                        }
+                    }
+                    AstRecordFieldType::Node( id ) => {
+                        quote! {
+                            pub #field_name: Option< #id< 'a > >,
+                        }
+                    },
+                    _ => quote! {},
+                }
+            } );
+
+        let name = &ast.name;
+
+        quote! {
+            pub struct #name < 'a > {
+                node: &'a SyntaxNode< 'a >,
+                #( #struct_items )*
+            }
+        }
+    }
+
+    fn get_cast_method( ast: &AstRecord ) -> proc_macro2::TokenStream {
+        let field_ids: HashSet< _ > = ast.fields
+            .iter()
+            .filter_map( | field | {
+                match &field.type_ {
+                    AstRecordFieldType::Nodes( id ) |
+                    AstRecordFieldType::Node( id ) => {
+                        Some( id )
+                    },
+                    _ => None,
+                }
+            } )
+            .collect();
+
+        let cast_vars = field_ids
+            .iter()
+            .map( | &field_id | {
+                let var_name = get_var_name( field_id );
+
+                quote! {
+                    let mut #var_name = node.children
+                    .iter()
+                    .filter_map( | e | match e {
+                        SyntaxElement::Node( node ) => #field_id::cast( node ),
+                        _ => None,
+                    } );
+                }
+            } );
+
+        let mut field_indexes: HashMap< String, usize > = HashMap::new();
+
+        let cast_record_items = ast.fields
+            .iter()
+            .filter_map( | field | {
+                let field_name = &field.name;
+
+                match &field.type_ {
+                    AstRecordFieldType::Node( field_id ) => {
+                        let var_name = get_var_name( field_id );
+
+                        let index = *field_indexes.entry( field_id.to_string() )
+                            .and_modify( | e | { *e += 1 } )
+                            .or_insert( 0 );
+
+                        Some( quote! {
+                            #field_name: #var_name.nth( #index ),
+                        } )
+                    },
+
+                    AstRecordFieldType::Nodes( field_id ) => {
+                        let var_name = get_var_name( field_id );
+
+                        Some( quote! {
+                            #field_name: #var_name.collect(),
+                        } )
+                    },
+
+                    _ => None,
+                }
+            } );
+
+        quote! {
             fn cast( node: &'a SyntaxNode< 'a > ) -> Option< Self > {
                 if Self::can_cast( node.kind ) {
-                    Some( Self { node } )
+                    #( #cast_vars )*
+
+                    Some( Self {
+                        node,
+                        #( #cast_record_items )*
+                    } )
+
                 } else {
                     None
                 }
             }
+        }
+    }
 
+    fn get_walk_method( ast: &AstRecord ) -> proc_macro2::TokenStream {
+        let walk_items = ast.fields
+            .iter()
+            .filter_map( | field | {
+                let field_name = &field.name;
+
+                match &field.type_ {
+
+                    AstRecordFieldType::Node( _ ) => Some( quote! {
+                        if let Some( x ) = self.#field_name.as_ref() {
+                            x.walk( callback );
+                        }
+                    } ),
+
+                    AstRecordFieldType::Nodes( _ ) => Some( quote! {
+                        self.#field_name
+                            .iter()
+                            .for_each( | x | {
+                                x.walk( callback );
+                            } );
+                    } ),
+
+                    _ => None,
+
+                }
+            } );
+
+        quote! {
             fn walk< T >( &'a self, callback: fn( &'a T ) ) where T: AstNode< 'a > {
                 #( #walk_items )*
+
+                if T::kind() == Self::kind() {
+                    let x = unsafe { std::mem::transmute::< &Self, &T >( self ) };
+                    callback( x );
+                }
             }
-
         }
-    };
+    }
 
-    r.into()
+    fn get_var_name( id: &Ident ) -> Ident {
+        format_ident!( "{}", id.to_string().to_lowercase() )
+    }
+
 }
+

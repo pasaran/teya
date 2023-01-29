@@ -7,6 +7,7 @@ use proc_macro2;
 use quote::{quote, format_ident};
 use syn::parse::{ Parse, ParseStream, Result };
 use syn::punctuated::Punctuated;
+use syn::token::Or;
 use syn::{ parse_macro_input, token, Token, braced, Ident, parenthesized };
 
 //  ---------------------------------------------------------------------------------------------------------------  //
@@ -259,7 +260,7 @@ fn ast_union( ast: AstUnion ) -> TokenStream {
             } );
 
         quote!{
-            fn walk< T >( &'a self, callback: fn( &'a T ) ) where T: AstNode< 'a > {
+            fn walk< T: AstNode< 'a > >( &'a self, callback: fn( &'a T ) ) {
                 match self {
                     #( #items )*
                 }
@@ -280,11 +281,15 @@ fn ast_record( ast: AstRecord ) -> TokenStream {
 
     let struct_def = get_struct_def( &ast );
 
+    let impls = get_impls( &ast );
+
     let cast_method = get_cast_method( &ast );
     let walk_method = get_walk_method( &ast );
 
     let r = quote! {
         #struct_def
+
+        #impls
 
         impl < 'a > AstNode< 'a > for #name< 'a > {
 
@@ -352,7 +357,7 @@ fn ast_record( ast: AstRecord ) -> TokenStream {
             } )
             .collect();
 
-        let cast_vars = field_ids
+        let vars = field_ids
             .iter()
             .map( | &field_id | {
                 let var_name = get_var_name( field_id );
@@ -369,7 +374,7 @@ fn ast_record( ast: AstRecord ) -> TokenStream {
 
         let mut field_indexes: HashMap< String, usize > = HashMap::new();
 
-        let cast_record_items = ast.fields
+        let struct_fields = ast.fields
             .iter()
             .filter_map( | field | {
                 let field_name = &field.name;
@@ -402,11 +407,11 @@ fn ast_record( ast: AstRecord ) -> TokenStream {
         quote! {
             fn cast( node: &'a SyntaxNode< 'a > ) -> Option< Self > {
                 if Self::can_cast( node.kind ) {
-                    #( #cast_vars )*
+                    #( #vars )*
 
                     Some( Self {
                         node,
-                        #( #cast_record_items )*
+                        #( #struct_fields )*
                     } )
 
                 } else {
@@ -444,13 +449,72 @@ fn ast_record( ast: AstRecord ) -> TokenStream {
             } );
 
         quote! {
-            fn walk< T >( &'a self, callback: fn( &'a T ) ) where T: AstNode< 'a > {
+            fn walk< T: AstNode< 'a > >( &'a self, callback: fn( &'a T ) ) {
                 #( #walk_items )*
 
                 if T::kind() == Self::kind() {
                     let x = unsafe { std::mem::transmute::< &Self, &T >( self ) };
                     callback( x );
                 }
+            }
+        }
+    }
+
+    fn get_impls( ast: &AstRecord ) -> proc_macro2::TokenStream {
+        let impls = ast.fields
+            .iter()
+            .filter_map( | field | {
+                match &field.type_ {
+                    AstRecordFieldType::Token( id ) => {
+                        Some( get_token_impl( &field.name, &id ) )
+                    }
+
+                    AstRecordFieldType::Tokens( tokens ) => {
+                        Some( get_token_set_impl( &ast.name, &field.name, tokens ) )
+                    }
+                    _ => None,
+                }
+            } );
+
+        quote! {
+            #( #impls )*
+        }
+    }
+
+    fn get_token_impl( field_name: &Ident, token: &Ident ) -> proc_macro2::TokenStream {
+        quote! {
+            impl< 'a > Name< 'a > {
+                pub fn #field_name( &'a self ) -> Option< &'a Token< 'a > > {
+                    self.node
+                        .find_token( TokenKind::#token )
+                }
+            }
+        }
+    }
+
+    fn get_token_set_impl( ast_name: &Ident, field_name: &Ident, tokens: &Punctuated< Ident, Or > ) -> proc_macro2::TokenStream {
+        let const_name = format_ident!( "TS_{}_{}",
+            ast_name.to_string().to_uppercase(),
+            field_name.to_string().to_uppercase()
+        );
+
+        let tokens = tokens
+            .iter()
+            .map( | x | quote! {
+                TokenKind::#x,
+            } );
+
+        quote! {
+            const #const_name: TokenSet = TokenSet::new( &[
+                #( #tokens )*
+            ] );
+
+            impl<'a> InlineBinary<'a> {
+
+                pub fn #field_name( &'a self ) -> Option< &'a Token< 'a > > {
+                    self.node.find_token_in_set( #const_name )
+                }
+
             }
         }
     }

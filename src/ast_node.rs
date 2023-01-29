@@ -12,6 +12,6 @@ pub trait AstNode< 'a > {
     fn cast( node: &'a SyntaxNode ) -> Option< Self >
         where Self: Sized;
 
-    fn walk< T >( &'a self, callback: fn( &'a T ) ) where T: AstNode< 'a >;
+    fn walk< T: AstNode< 'a > >( &'a self, callback: fn( &'a T ) );
 
 }
